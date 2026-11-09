@@ -48,6 +48,9 @@ UI 文案（如设置项、帮助文本）和贴图也按照同样的思路，�
 
 本补丁占用 `patch3`，`patch` 和 `patch2` **可供其他补丁使用**，只需遵循特定约定（详见 [`doc/engine-mechanics.md`](doc/engine-mechanics.md) 和 [`doc/file-formats.md`](doc/file-formats.md)）。
 
+> 目前支持的补丁：
+> - [9nine_EP1_Uncensored_Patch](https://github.com/Madao-1639/9nine_EP1_Uncensored_Patch)
+
 ## 已知情况
 
 | 项 | 内容 |

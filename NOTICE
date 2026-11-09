@@ -1,12 +1,7 @@
 许可范围说明
 
-- 本仓库是 carrotciallo/9nine-ep1-chs 的重构分支（fork）。原项目的 MIT 许可证（见 LICENSE）
-  继续适用于本仓库的代码与文档。
+- 本仓库是 carrotciallo/9nine-ep1-chs 的重构分支（fork）。原项目的 MIT 许可证（见 LICENSE）继续适用于本仓库的代码与文档。
 - 许可证覆盖范围：`tool/`、`script/`、`doc/`、`resource/`（其中的分析产物与清单）以及 README、AGENTS.md 等仓库文本。
-- 补丁所用的汉化译文版权归樱空汉化组所有，游戏本体素材版权归其权利方所有；两者均不包含在本
-  仓库内，也不在本许可证的授权范围内。`releases/` 下的补丁产物由使用者用自备的正版游戏文件
-  在本地构建，不入库。
-- `tool/cx.py` 依据 GARbro（`ArcFormats/KiriKiri/KiriKiriCx.cs`）的实现独立重写；上游 GARbro、
-  FreeMote、KirikiriTools 均为 MIT 许可证，版权归各自作者所有。
-- 本仓库不包含 Cx 参数以外的任何游戏专属数据；`resource/cx/profile_9nine.json` 为互操作所需的
-  加密参数（取自 GARbro 的公开方案库）。
+- 补丁所用的汉化译文版权归樱空汉化组所有，游戏本体素材版权归其权利方所有；两者均不包含在本仓库内，也不在本许可证的授权范围内。`releases/` 下的补丁产物由使用者用自备的正版游戏文件在本地构建，不入库。
+- `tool/cx.py` 依据 GARbro（`ArcFormats/KiriKiri/KiriKiriCx.cs`）的实现独立重写；上游 GARbro、FreeMote、KirikiriTools 均为 MIT 许可证，版权归各自作者所有。
+- 本仓库不包含 Cx 参数以外的任何游戏专属数据；`resource/cx/profile_9nine.json` 为互操作所需的加密参数（取自 GARbro 的公开方案库）。
