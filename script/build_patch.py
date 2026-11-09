@@ -31,7 +31,6 @@ from __future__ import annotations
 
 import argparse
 import ctypes
-import hashlib
 import io
 import mmap
 import os
@@ -42,6 +41,8 @@ import zlib
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tool import cx, krkr_text, xp3
+# 容器写法与 `script/build_cg_patch.py` 共用（`tool/xp3build.py`），本脚本只负责「装哪些文件」。
+from tool.xp3build import md5_name, write_archive
 
 PROT = 0x80000000
 HOOK_LINES = [
@@ -57,66 +58,6 @@ HOOK_LINES = [
     '}',
 ]
 HOOK = chr(10).join(HOOK_LINES) + chr(10)
-def md5_name(path: str) -> str:
-    return hashlib.md5(path.encode("utf-16-le")).hexdigest()
-
-
-def write_archive(path: str, files: list[tuple[str, bytes]], crypt) -> int:
-    """变体头 + Cx 加密 + hnfn + zlib 索引（与官方 data.xp3/steam.xp3 同构）。"""
-    out = io.BytesIO()
-    out.write(xp3.XP3_SIG)
-    out.write(struct.pack("<q", 0x17))
-    out.write(struct.pack("<I", 1))
-    out.write(struct.pack("<I", 0x80))
-    out.write(bytes(5))
-    idx_pos = out.tell()
-    out.write(struct.pack("<q", 0))
-
-    placed = []
-    for name, plain in files:
-        adlr = zlib.adler32(plain) & 0xFFFFFFFF
-        packed = zlib.compress(crypt.crypt(adlr, plain), 9)
-        off = out.tell()
-        out.write(packed)
-        placed.append((name, plain, adlr, packed, off))
-
-    # 官方打包器是「每个文件一条 hnfn」，hnfn 全部在前、File 在后。写成一条大 hnfn 时，
-    # 引擎只认得出第一条条目的名字 → `addAutoPath("x.xp3>sub/")` 只暴露一个文件（实测差异的根因）。
-    index = io.BytesIO()
-    for name, _plain, adlr, _packed, _off in placed:
-        hn = struct.pack("<Ih", adlr, len(name)) + name.encode("utf-16-le")
-        index.write(b"hnfn" + struct.pack("<q", len(hn)) + hn)
-
-    for name, plain, adlr, packed, off in placed:
-        nh = md5_name(name)
-        nbytes = nh.encode("utf-16-le") + bytes(2)
-        info = xp3.Xp3Info_t()
-        info.flags = PROT
-        info.fsize, info.zsize, info.namelen = len(plain), len(packed), len(nh)
-        segm = xp3.Xp3Segm_t()
-        segm.flags = xp3.TVP_XP3_SEGM_ENCODE_ZLIB
-        segm.offset, segm.fsize, segm.zsize = off, len(plain), len(packed)
-        adlr_b = xp3.Xp3Adlr_t()
-        adlr_b.hash = adlr
-        chunks = (b"time" + struct.pack("<q", 8) + bytes(8)
-                  + b"adlr" + struct.pack("<q", 4) + bytes(adlr_b)
-                  + b"segm" + struct.pack("<q", ctypes.sizeof(xp3.Xp3Segm_t)) + bytes(segm)
-                  + b"info" + struct.pack("<q", ctypes.sizeof(xp3.Xp3Info_t) + len(nbytes))
-                  + bytes(info) + nbytes)
-        index.write(b"File" + struct.pack("<q", len(chunks)) + chunks)
-
-    idx_off = out.tell()
-    out.seek(idx_off)
-    packed_index = zlib.compress(index.getvalue(), 6)
-    out.write(bytes([1]))
-    out.write(struct.pack("<QQ", len(packed_index), index.getvalue().__len__()))
-    out.write(packed_index)
-    out.seek(idx_pos)
-    out.write(struct.pack("<q", idx_off))
-    blob = out.getvalue()
-    with open(path, "wb") as fp:
-        fp.write(blob)
-    return len(blob)
 
 
 def build_steam(official: str, out_path: str, crypt,

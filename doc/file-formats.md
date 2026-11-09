@@ -57,7 +57,8 @@ PSB 头 `0x28` 处 4 字节是 checksum。**注意**：现存的 scn checksum �
 
 ## 3.5 本项目补丁包的头部（与官方同构）
 
-`script/build_patch.py` 写出的补丁归档（交付用的 `releases/steam.xp3`，以及显式 `--with-patch3` 才产出的 `releases/patch3.xp3`）头部与官方 `data.xp3` 完全同构：`0x0B` 处 u64=0x17（伪索引偏移）、`0x17` 处 u32=0x80（变体标记）、`0x1B` 5 字节填充、`0x20` 处 u64=真索引偏移、内容区从 `0x28` 开始；索引 zlib 压缩（首字节 `1`）。
+`script/build_patch.py` 写出的补丁归档（`releases/steam.xp3` 与 `releases/patch3.xp3`）头部与官方 `data.xp3` 完全同构：`0x0B` 处 u64=0x17（伪索引偏移）、`0x17` 处 u32=0x80（变体标记）、`0x1B` 5 字节填充、`0x20` 处 u64=真索引偏移、内容区从 `0x28` 开始；索引 zlib 压缩（首字节 `1`）。
+写入器只有一份：`tool/xp3build.write_archive`（`script/build_patch.py` 调用，`hnfn` 每文件一条等约束见上）。
 不加密的 `releases/unencrypted.xp3` 则是标准 XP3 头（`0x0B` 直接是索引偏移）、`adlr=0`、不加密。
 
 ## 4. 名字反查

@@ -1,97 +1,94 @@
-# 9-nine-:Episode 1 简中补丁
+# 9-nine-:Episode 1 简中汉化移植
 
-Steam 版《9-nine-:Episode 1》（appid 976390）的简体中文文本补丁。
+将【樱空汉化组 Ver1.0】的简体中文文本移植到 Steam 版[《9-nine-:Episode 1》](https://store.steampowered.com/app/976390/)（九次九日九重色），作为**新增语言选项**——官方日文、英文、繁体中文三条语言轨不受影响，可随时在游戏内切换。
 
-- 文本来源：樱空汉化组 Ver1.0 简中文本 + 官方界面素材
-- 目标：**四语言轨**——官方 `jp` / `en` / `cn`（繁中）三轨原样保留，新增第 4 轨 `sc`（简中，正文 + 选项 + UI 文案 + 界面贴图）
-- 不替换 `nine_kokoiro.exe` / `steam_api.dll` / `.sig`，也不带第三方 DLL，从 Steam 正常启动
+> 本仓库只包含文本移植与界面汉化所需的分析和工具，不含游戏本体文件；补丁仅供已购买正版的用户使用。
 
-> 本仓库只包含分析与构建工具，不含游戏本体资源。补丁仅供已购买正版的用户使用。
+![Banner](https://shared.steamstatic.com/store_item_assets/steam/apps/976390/library_hero.jpg)
 
-## 目录
+---
 
-```
-tool/        长期复用库（xp3 / cx / psb / mdf / scn / tlg / pngio / textset / krkr_text / tjs2）
-script/      流程脚本（解包、提取、校验、回写、UI 语料、打包）
-resource/    文本集、UI 语料、名称清单、校验字表、第三方模板
-doc/         格式、文本模型、引擎机制、教训、验收标准
-releases/    交付物（不入库）
-```
+## 安装 / 卸载 / 更新
 
-补丁产物（`releases/*.xp3`、`releases/font/`）**不入库**（二进制 + 含游戏素材），按上面管线在本地构建；发行说明按需临时书写，不入库。
+**安装**：
 
-## 补丁形态
+1. 从 [Releases](../../releases) 下载发布压缩包并解压，得到 `steam.xp3`、`patch3.xp3` 和 `font/` 文件夹；
+2. 打开游戏安装目录（Steam 库 → 右键游戏 →【管理】→【浏览本地文件】）；
+3. 建议把官方 `steam.xp3` 改名备份为 `steam.xp3.orig`，补丁会替换这个文件，备份方便卸载；
+4. 复制解压出来的 `steam.xp3`、`patch3.xp3` 到游戏目录，把 `font/` 整个文件夹复制成 `<游戏目录>/font/`；
+5. 启动游戏 → 设置 → 语言页：界面语言与正文语言都选「简体中文」（只需设置一次）。
 
-| 文件 | 大小 | 作用 |
-|---|---|---|
-| `releases/steam.xp3` | 19 KB | **hook 注入**：官方 4 条 + `steam_r18hack.tjs`（源码钩子：转发官方 → 逐槽位注册根域并加载 `<slot>_boot.tjs`）+ 官方原字节码副本 |
-| `releases/patch3.xp3` | 12.2 MB | **简中内容归档**：17 个四块 scn（jp/en/cn 官方原文 + 第 4 块简中）+ UI 语料（`main/syslangtext_sc.ini`、`main/help_conf_sc.txt`、`main/help_exch_sc.txt`）+ 21 张 `uipsd/sc/*_sc.pimg` + 2 张 `image/attention*_sc.png` + 运行期逻辑 `sc_hook.tjs`（归档根） + 路径清单 `patch3_boot.tjs`（都在归档里，日常更新只换这个包） |
-| `releases/font/` | 17 MB | **思源黑体 CN**（Bold/Medium，OFL）：运行期注册成 `9nineSC-B/M`；字体只能放松散文件，复制成 `<游戏目录>/font/` |
-| 安装 | 官方 `steam.xp3` 改名 `steam.xp3.orig`；复制 `steam.xp3` + `patch3.xp3` 进游戏目录；`releases/font/` 整目录复制成 `<游戏目录>/font/` |
-| 卸载 | 删 `patch3.xp3` 与 `<游戏目录>/font/`，把 `steam.xp3.orig` 改名回 `steam.xp3` |
+**更新**：下载新版压缩包解压，用里面的 `patch3.xp3` 覆盖游戏目录里的旧文件即可；没有特殊说明 `steam.xp3` 与 `font/` 不用动。
 
-`patch.xp3` / `patch2.xp3` 留给第三方补丁：钩子按 `patch → patch2 → patch3` 的顺序注册根域并加载各自的`<slot>_boot.tjs`，所以第三方只要遵循同一约定即可叠加，不需要改 `steam.xp3`（见下一节）。
+**卸载**：删除 `patch3.xp3` 和 `<游戏目录>/font/`；再把之前备份的 `steam.xp3.orig` 改名回 `steam.xp3`，或者通过 Steam 验证游戏完整性还原。
 
-为什么必须动 `steam.xp3`：本作引擎只注册固定名单的归档，且 `addArchive` 系相对 `data.xp3` 优先级不足；唯一稳定做法是在「会被执行的脚本」（`steam_r18hack.tjs`）里注入一次注册 + 引导加载。详见 `doc/engine-mechanics.md` §0/§3/§4.1。
+补丁不替换 `nine_kokoiro.exe`、`steam_api.dll` 与任何 `.sig`，也不附带 DLL；成就与云存档不受影响。除 `steam.xp3` 外不改动任何官方文件。
 
-## 新增合法名：`<slot>.xp3>` 与 `<slot>_boot.tjs`
+---
 
-本作引擎只会自动注册固定名单的归档名（`data`/`steam`/`system`/`patch`/…）。这套约定做的事就是**在不改引擎的前提下扩展合法名**，并**提升目标归档的优先级**：任何补丁只要提供 `<名>.xp3` + 该归档根目录的 `<名>_boot.tjs`，就等于向引擎新增了一个可用的归档名，且加载路径/优先级由它自己声明。
+## 实现原理
 
-钩子（`steam.xp3` 里的 `steam_r18hack.tjs`）只做两件事：转发官方、对每个补丁槽位 `patch` / `patch2` / `patch3` 依次「注册 `<slot>.xp3>` 根域 + 加载归档内存在的 `<slot>_boot.tjs`」。**它不注册任何子目录**——目录布局由各补丁自己在 boot 里决定，互不代劳。
+剧情不是文本文件，是编译过的脚本。每句对白在脚本里是一个独立字符串，所以能按「哪个脚本、哪段场景、第几句」精确定位。
 
-- 模板：[`resource/patch_boot.tjs.template`](resource/patch_boot.tjs.template)。复制成 `patch_boot.tjs` / `patch2_boot.tjs` / `patch3_boot.tjs`，放在**补丁归档的根目录**，文件存成 **UTF-16LE + BOM**，打包成同名 `patch*.xp3` 即可。
-- 必须自己注册的内容：归档内每个**子目录**（`scn/`、`main/`、`image/`、`uipsd/cn/` …）；归档**根**下的条目靠根域就能被裸名命中（扁平包零配置）。
-- 优先级 = 注册顺序（后注册优先）：槽位顺序 `patch < patch2 < patch3`，boot 内部的先后由你决定。
-- 限制：槽位名是引擎侧约定，新增第 4 个槽位需要重建一次 `steam.xp3`；字体只能放松散目录（`System.addFont` 读不了 `archive://`）；不要让 `main/*.tjs` 或 `ConfigEx.tjs` 之类"更早加载"的脚本走覆盖（实测无效 / 会崩）。
+官方脚本每行对白存三条文本：日文、英文、繁中。这个补丁给每行再追加第四条：简中。
 
-### 扩展点与成本
+引擎不认识简中标签，所以得先注册一个新的语言标签。钩子启动时把它加进语言表，之后设置页才能新增「简体中文」选项。
 
-| 想扩展什么 | 怎么改 | 成本 |
-|---|---|---|
-| 新增/调整包内目录（`scn/`、`foo/`…） | 改自己归档里的 `<slot>_boot.tjs`，加一行 `addAutoPath("<slot>.xp3>foo/")` | 重打自己的包，**不动** `steam.xp3` |
-| 新增内容（文本/贴图/字体映射/运行期逻辑） | 只改自己的包（逻辑脚本用 `KAGLoadScript` 从包内加载） | 重打自己的包 |
-| 与其它补丁叠加 | 各自提供 `<slot>_boot.tjs`，互不代劳；冲突由槽位顺序（`patch < patch2 < patch3`）表达 | 同上 |
-| 新增第 4 个槽位（`patch4`…）或换槽位名 | 改钩子里的 `__slots` 数组 | **一次性**重建 `steam.xp3` |
-| 让补丁用任意归档名（连槽位名也不约定） | 需要"运行时读取清单/扫描目录"能力：TJS 能否读游戏目录文本**待验证**；彻底方案是 DLL 在 open 层拦截（`KirikiriTools` 的做法，本项目不采用） | 现状边界，见下 |
+界面文案（设置项、帮助文本）和界面贴图也照这个思路做第 4 个变体。官方字体缺简中字形，所以包里带了一份思源黑体 CN，运行时注册，正文才不缺字。
 
-**已知边界**：槽位名与 `<slot>_boot.tjs` 的命名是引擎侧约定、写死在钩子里；`main/*.tjs` 这类"更早执行"的脚本无法通过覆盖生效（官方脚本在钩子之前就跑完了）；字体只能放松散 `<游戏目录>/font/`（`System.addFont` 读不了 `archive://`）。
+### 生效机制
 
-机制与实测依据见 `doc/engine-mechanics.md` §3.2（autopath = 纯前缀）、§4.1（槽位约定、探针输出）。
+引擎只加载特定名字的归档，但这些归档的优先级低于官方内容，唯一能改的地方是 `steam.xp3` 里的启动脚本。我们在此注入钩子，借此在启动流程末尾将我们的归档挂到最高优先级。
 
-## 快速开始
+### 补丁槽位
 
-```powershell
-mamba run -n GalRev python script/verify_cx.py       # Cx 解密黄金向量
-```
+即使归档能被引擎识别，归档内的文件路径也需要注册。
 
-完整构建管线（需要自备正版游戏文件）：
+为实现勾子与归档的解耦，我们不在钩子内注册任何目录，只开通 `patch`、`patch2`、`patch3` 三个槽位，按顺序注册 `<槽位>.xp3>` 这个根域，再加载归档根目录下的 `<槽位>_boot.tjs`，由 `<槽位>_boot.tjs` 自定义当前归档下应该注册哪些路径。
 
-> 语料（`resource/chs_text`、`resource/official_{jp,en,cn}`、`resource/ui_sc`）已入库且经人工修订，**是唯一来源**；下面两条 `extract_text.py` 仅留档，正常流程不用跑（重跑会覆盖语料）。
+本补丁占用 `patch3`（`patch3.xp3` 加归档根的 `patch3_boot.tjs`），`patch` 和 `patch2` **可供其他补丁使用**，只需遵循特定约定（详见 [`doc/engine-mechanics.md`](doc/engine-mechanics.md) 和 [`doc/file-formats.md`](doc/file-formats.md)）。
 
-```powershell
-mamba run -n GalRev python script/unpack_xp3.py "E:/SteamLibrary/steamapps/common/nine_kokoiro/data.xp3" --cx-profile resource/cx/profile_9nine.json --only scn/ --out resource/official_scn
-# 需要重新提取民汉文本时（仅留档），--from-xp3 指向一份明文包
-mamba run -n GalRev python script/extract_text.py --from-xp3 <明文包>/unencrypted.xp3 --lang cn --out resource/chs_text
-foreach ($l in "cn","jp","en") { mamba run -n GalRev python script/extract_text.py --from-dir resource/official_scn --lang $l --out "resource/official_$l" }
-mamba run -n GalRev python script/verify_extract.py --base resource/official_jp --target resource/chs_text --out resource/verify
-mamba run -n GalRev python script/extend_lang.py --official resource/official_scn/scn --text resource/chs_text --out tmp/build/lang4
-mamba run -n GalRev python script/verify_lang4.py --official resource/official_scn/scn --built tmp/build/lang4/scn --text resource/chs_text
-# UI 语料（贴图已入库；只在需要重抽时跑，标题贴图需要本机装有华康圆体 W9，见 doc/engine-mechanics.md §5.7）
-mamba run -n GalRev python script/extract_ui_sc.py                  # 20 张 pimg + 2 张 attention -> resource/ui_sc/
-mamba run -n GalRev python script/gen_ui_func.py                    # conf_lang.func 覆盖（psd 行改 GetUIFile）
-mamba run -n GalRev python script/make_ui_lang_caption.py           # 语言页三行标题 conf_lang_sc.pimg
-# 打包（官方 steam.xp3 默认取 resource/official_steam/steam.xp3）
-mamba run -n GalRev python script/build_patch.py --scn-dir tmp/build/lang4/scn --out releases
-mamba run -n GalRev python script/verify_ui_sc.py --patch releases/patch3.xp3 --steam releases/steam.xp3
-```
+## 已知情况
 
-详细约定见 `AGENTS.md`，技术结论见 `doc/`。
-
-## 来源与致谢
-
-| 内容 | 出处 |
+| 项 | 内容 |
 |---|---|
-| 汉化文本 | 樱空汉化组 Ver1.0 |
-| 引擎分析 | `GalRev`（krkr/MDF 卷） |
-| 工程架构 | `MashiroiroSymphonyFHD_Retranslation_Patch` |
+| 剧情脚本 | 17 个 |
+| 对白行 | 9,327 行 |
+| 选项 | 9 条 |
+| 语言轨 | 官方 3 轨（日 / 英 / 繁中）保留，新增 1 轨（简中） |
+
+剧情对白、选项、界面文案、界面贴图均已汉化。
+
+## 目录结构
+
+```
+doc/        技术文档（格式规范、文本模型、引擎机制、踩坑记录、验收标准）
+resource/   语料与素材（民汉文本、官方三轨语料、UI 语料、字体、Cx 参数、模板）
+script/     流程脚本（解包 / 提取 / 校验 / 四轨回写 / UI 制作 / 打包）
+tool/       通用库（容器与加密 / PSB 脚本 / 文本集 / 图像 / 字体相关）
+releases/   交付物
+```
+
+## 完成进度
+
+- [x] 民汉文本提取，与官方逐脚本行数严格一致（17/17 脚本、9,327 行、9 条选项）
+- [x] 四轨回写，官方三轨逐字节不动，零改动重建往返一致
+- [x] 界面文案（`syslangtext` / 帮助文本）与界面贴图汉化
+- [x] 字体随包（思源黑体 CN Bold/Medium，OFL）运行期注册
+- [x] 实机验证：设置页、确认框和提示都是简中，正文为简中，可以切回官方三轨
+- [ ] 全流程抽验：逐句比对、自动播放与快进节奏、各结局分支
+
+## 反馈
+
+遇到问题请提交 [Issue](../../issues)，附上：
+
+- 补丁版本
+- 出现问题的具体场景（大致进度；最好附上存档文件）
+- 游戏弹出的错误日志（如有）
+- 问题的具体表现
+
+## 致谢
+
+- 汉化文本：樱空汉化组 Ver1.0
+- [tjs2Decompiler](https://github.com/xmoezzz/tjs2Decompiler)：TJS 反汇编思路
+- [GARbro](https://github.com/morkt/GARbro)：加密归档的方案与参数
