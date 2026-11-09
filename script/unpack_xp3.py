@@ -8,8 +8,8 @@
         --cx-profile resource/cx/profile_9nine.json \\
         --only scn/ --out resource/official_scn
 
-    # 明文包（archive/ 里的初版补丁）
-    mamba run -n GalRev python script/unpack_xp3.py archive/releases/unencrypted.xp3 --out tmp/patch_files
+    # 明文包（adlr=0 的普通 xp3，不随仓库分发）
+    mamba run -n GalRev python script/unpack_xp3.py <明文包>/unencrypted.xp3 --out tmp/patch_files
 
 要点：
   * 索引本身是明文（`0x17` 处 `0x80` 的变体：真索引偏移在 `0x20`），条目内容才是 Cx 加密；

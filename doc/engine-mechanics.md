@@ -329,7 +329,7 @@ PSB 的容器体是「相对偏移 + 顺序嵌套」布局（`LIST`/`OBJECTS` �
 
 ### 5.4 字体：官方只带 JP/TC，简中字形覆盖不足
 
-`data.xp3` 里的字体是**小写路径**的 10 个 OTF：`font/sourcehansans{jp,tc}-{medium,bold,heavy}.otf`、`font/sourcehanserif{jp,tc}-{bold,heavy}.otf`，**没有 CN/SC 字体**。`font/embfontlist.tjs` 里 CN（简体）那一段本来就是注释掉的；民汉初版补丁的 `font/embfontlist.tjs` 与官方**完全一致**（他们只是把 TC 字体又打进了自己的包），也没有 CN 字体文件。
+`data.xp3` 里的字体是**小写路径**的 10 个 OTF：`font/sourcehansans{jp,tc}-{medium,bold,heavy}.otf`、`font/sourcehanserif{jp,tc}-{bold,heavy}.otf`，**没有 CN/SC 字体**。`font/embfontlist.tjs` 里 CN（简体）那一段本来就是注释掉的；民汉素材里的 `font/embfontlist.tjs` 与官方**完全一致**（他们只是把 TC 字体又打进了自己的包），也没有 CN 字体文件。
 
 **cmap 覆盖 ≠ 游戏内渲染正确**：`script/check_font_coverage.py` 读 cmap 会给出「TC 字体对 2460 个语料字符缺字 0」这种数字（JP 缺 613），但第 4 轨即使指向 TC 字体仍然乱码/缺字，离线覆盖率不能当作结论（见 `lessons-learned.md` §8.2）。
 

@@ -32,16 +32,16 @@
 
 依据：对 `data.xp3` 里 21 个条目（17 个 scn + `startup.tjs` + `syslangtext_cn.ini` + `help_conf_cn.txt` + `embfontlist.tjs`），`tool/cx.py` 的输出与 GARbro 的 `ICrypt.Decrypt` **逐字节一致**（21/21）。加解密同一算式（XOR），因此同一实现也用来**写**补丁包。
 
-### 1.2 明文包（`archive/releases/unencrypted.xp3`）
+### 1.2 明文包（`adlr=0` 的另一种 XP3 形态，本项目不用）
 
-初版补丁包是普通 XP3：`adlr=0`（不加密标记），索引未压缩，同一内容登记三别名（全路径 / basename / `md5(UTF-16LE 全路径)`）。这种包引擎读不了，必须配 `version.dll`（KirikiriUnencryptedArchive），因此本项目交付物用 Cx 加密包。
+另有一种普通 XP3：`adlr=0`（不加密标记），索引未压缩，同一内容登记三别名（全路径 / basename / `md5(UTF-16LE 全路径)`）。这种包引擎读不了，必须配 `version.dll`（KirikiriUnencryptedArchive），因此本项目交付物用 Cx 加密包。
 
 ## 2. `.scn`：裸 PSB v3
 
 本作的剧情脚本**没有** `mdf\0 + zlib` 外壳，直接是 `PSB\0`（版本 3，header_encrypt=0）。
 `tool/psb.py` 按 FreeMote 公开规格解析；`tool/mdf.py` 给出本作的文本模型（见 `text-model.md`）。
 
-PSB 头 `0x28` 处 4 字节是 checksum。**注意**：初版补丁包里的 scn checksum 取自官方原文件（`adler32`/`crc32` 都对不上任何前缀），说明**引擎不校验**该字段；本项目重建时由 `tool/psb.py` 重新计算。
+PSB 头 `0x28` 处 4 字节是 checksum。**注意**：现存的 scn checksum 取自官方原文件（`adler32`/`crc32` 都对不上任何前缀），说明**引擎不校验**该字段；本项目重建时由 `tool/psb.py` 重新计算。
 
 ## 3. TVP 加扰文本（`main/*.tjs`、`syslangtext`、`help`）
 
@@ -86,7 +86,7 @@ blocksize[nblocks] u32 × nblocks
 - LZSS 的 4096 字节滑窗在整张图的所有块、所有平面之间**连续**复用；匹配允许与当前位置重叠
   （逐字节复制的 run-length）。**不是 zlib**，第一次实现时踩过这个坑。
 - `colors` 是 3（BGR）或 4（BGRA）；TLG5 内部通道顺序是 **BGRA**。
-- 归档里也可能出现 **TLG6**（`TLG0.0\0sds\x1a` + `TLG6.0…`，Golomb 编码）：初版补丁包（民汉素材）的 20 张 `pimg` 就是 TLG6，本项目只实现 TLG5 的编解码（`tool/tlg.py`），写出去的 `_sc` 贴图一律 TLG5；引擎两种都读，实测 TLG5 产物能正常显示。依据：`resource/ui_sc/uipsd/sc/*.pimg` 里 `TLG6` 魔数计数 24 次（民汉）vs 我们产出的 `conf_lang_sc.pimg` 全是 TLG5。
+- 归档里也可能出现 **TLG6**（`TLG0.0\0sds\x1a` + `TLG6.0…`，Golomb 编码）：民汉素材的 20 张 `pimg` 就是 TLG6，本项目只实现 TLG5 的编解码（`tool/tlg.py`），写出去的 `_sc` 贴图一律 TLG5；引擎两种都读，实测 TLG5 产物能正常显示。依据：`resource/ui_sc/uipsd/sc/*.pimg` 里 `TLG6` 魔数计数 24 次（民汉）vs 我们产出的 `conf_lang_sc.pimg` 全是 TLG5。
 
 
 解码/编码实现：`tool/tlg.py`（GARbro `ArcFormats/KiriKiri/ImageTLG.cs` TLG5 分支的 Python 移植，编码侧是自写的 LZSS）；PNG 读写：`tool/pngio.py`。

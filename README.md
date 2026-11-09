@@ -2,7 +2,7 @@
 
 Steam 版《9-nine-:Episode 1》（appid 976390）的简体中文文本补丁。
 
-- 文本来源：樱空汉化组 Ver1.0（经初版补丁归档转手）+ 官方简中界面素材
+- 文本来源：樱空汉化组 Ver1.0 简中文本 + 官方界面素材
 - 目标：**四语言轨**——官方 `jp` / `en` / `cn`（繁中）三轨原样保留，新增第 4 轨 `sc`（简中，正文 + 选项 + UI 文案 + 界面贴图）
 - 不替换 `nine_kokoiro.exe` / `steam_api.dll` / `.sig`，也不带第三方 DLL，从 Steam 正常启动
 
@@ -16,7 +16,6 @@ script/      流程脚本（解包、提取、校验、回写、UI 语料、打�
 resource/    文本集、UI 语料、名称清单、校验字表、第三方模板
 doc/         格式、文本模型、引擎机制、教训、验收标准
 releases/    交付物（不入库）
-archive/     初版补丁作者的归档（只读，不入库）
 ```
 
 补丁产物（`releases/*.xp3`、`releases/font/`）**不入库**（二进制 + 含游戏素材），按上面管线在本地构建；发行说明按需临时书写，不入库。
@@ -63,7 +62,6 @@ archive/     初版补丁作者的归档（只读，不入库）
 ## 快速开始
 
 ```powershell
-mamba run -n GalRev python script/selftest.py        # 工程自检
 mamba run -n GalRev python script/verify_cx.py       # Cx 解密黄金向量
 ```
 
@@ -73,16 +71,16 @@ mamba run -n GalRev python script/verify_cx.py       # Cx 解密黄金向量
 
 ```powershell
 mamba run -n GalRev python script/unpack_xp3.py "E:/SteamLibrary/steamapps/common/nine_kokoiro/data.xp3" --cx-profile resource/cx/profile_9nine.json --only scn/ --out resource/official_scn
-mamba run -n GalRev python script/extract_text.py --from-xp3 archive/releases/unencrypted.xp3 --lang cn --out resource/chs_text
+# 需要重新提取民汉文本时（仅留档），--from-xp3 指向一份明文包
+mamba run -n GalRev python script/extract_text.py --from-xp3 <明文包>/unencrypted.xp3 --lang cn --out resource/chs_text
 foreach ($l in "cn","jp","en") { mamba run -n GalRev python script/extract_text.py --from-dir resource/official_scn --lang $l --out "resource/official_$l" }
 mamba run -n GalRev python script/verify_extract.py --base resource/official_jp --target resource/chs_text --out resource/verify
 mamba run -n GalRev python script/extend_lang.py --official resource/official_scn/scn --text resource/chs_text --out tmp/build/lang4
 mamba run -n GalRev python script/verify_lang4.py --official resource/official_scn/scn --built tmp/build/lang4/scn --text resource/chs_text
-# UI 语料（可从初版补丁包抽取贴图；标题贴图需要本机装有华康圆体 W9，见 doc/engine-mechanics.md §5.7）
+# UI 语料（贴图已入库；只在需要重抽时跑，标题贴图需要本机装有华康圆体 W9，见 doc/engine-mechanics.md §5.7）
 mamba run -n GalRev python script/extract_ui_sc.py                  # 20 张 pimg + 2 张 attention -> resource/ui_sc/
 mamba run -n GalRev python script/gen_ui_func.py                    # conf_lang.func 覆盖（psd 行改 GetUIFile）
 mamba run -n GalRev python script/make_ui_lang_caption.py           # 语言页三行标题 conf_lang_sc.pimg
-mamba run -n GalRev python script/gen_ui_trad_chars.py              # 繁中残留字表（校验用）
 # 打包（官方 steam.xp3 默认取 resource/official_steam/steam.xp3）
 mamba run -n GalRev python script/build_patch.py --scn-dir tmp/build/lang4/scn --out releases
 mamba run -n GalRev python script/verify_ui_sc.py --patch releases/patch3.xp3 --steam releases/steam.xp3

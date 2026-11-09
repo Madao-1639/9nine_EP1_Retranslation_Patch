@@ -48,7 +48,7 @@ text       = 日文选项文本
 language   = [null, {searchtext,speechtext,text}(en), {searchtext,speechtext,text}(cn)]
 ```
 
-全作共 9 条。依据：`resource/official_jp/_index.json` 的 `selects` 合计 9。**cn 轨的选项文本在民汉源里就是官方繁中**（民汉初版补丁未翻选项），本项目依日文原文**就地翻译一份简中，直接写进语料**（`resource/chs_text/scripts/*.selects.jsonl` 的 `text`/`searchtext`/`speechtext` 三字段同值）；回写只是照语料取值，**不存在旁路覆盖表**。产物侧 27 个槽（9 条 × text/searchtext/speechtext）逐值校验，依据：`script/verify_lang4.py` 的 `selects` 校验。
+全作共 9 条。依据：`resource/official_jp/_index.json` 的 `selects` 合计 9。**cn 轨的选项文本在民汉源里就是官方繁中**（民汉源未翻选项），本项目依日文原文**就地翻译一份简中，直接写进语料**（`resource/chs_text/scripts/*.selects.jsonl` 的 `text`/`searchtext`/`speechtext` 三字段同值）；回写只是照语料取值，**不存在旁路覆盖表**。产物侧 27 个槽（9 条 × text/searchtext/speechtext）逐值校验，依据：`script/verify_lang4.py` 的 `selects` 校验。
 
 | 脚本 | 索引 | 日文原文 | 简中译文 |
 |---|---|---|---|

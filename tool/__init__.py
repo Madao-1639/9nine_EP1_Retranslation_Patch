@@ -11,7 +11,7 @@
 
 来源：xp3/psb/scn 来自本机知识库 `../../../../GalRevserse/GalRev/galrev/krkr/`（2026-11-08 复制；
 引擎级结论改动需两边同步）；`cx.py` 依据 GARbro 的 `KiriKiriCx.cs` 独立移植（与 GARbro 逐字节一致）；
-textset 来自纯白交响曲 FHD 移植项目；krkr_text 来自 `archive/tools/krkr_text.py`（初版补丁作者）。
+textset 来自纯白交响曲 FHD 移植项目；krkr_text 是 TVP 加扰文本实现（参考早期补丁工具重写）。
 
 本作是 **Cx 变体**（不是 Hxv4），因此没有把 galrev 的 hxv4/hxv4_write/hxv4hash 带进来。
 """

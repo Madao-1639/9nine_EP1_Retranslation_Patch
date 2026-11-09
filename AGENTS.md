@@ -30,8 +30,7 @@ UI 文案（`syslangtext`、`help_*`、界面贴图）**不在补丁范围**，�
 | 补丁形态 | **`steam.xp3`(20 KB, hook 注入) + `patch3.xp3`(2.2 MB, 17 个四块 scn) + 松散 `font/`(思源黑体 CN Bold/Medium, 运行期注册)**；多文件归档可用，但索引必须**每文件一条 `hnfn`**。见 `doc/engine-mechanics.md` §3.1/§5/§6 |
 | 注册形态 | 引擎脚本里只有三种：整包根域 `addAutoPath("name>")`、松散目录 `addAutoPath(System.exePath + "dir/")`、子域 `addAutoPath("name>dir/")`。整包根域只匹配**全路径**请求，而 scn 是**裸名**请求；子域别名只对 exe 注册过的 `data.xp3` 正常，对我们后加的 patch 归档退化（四种写法都试过，见 `doc/engine-mechanics.md` §3.1）。**scn 交付必须走松散目录** |
 | Steam 归档 | `data.xp3` 等为 **XP3 的 Cx 加密变体**（`0x17` 处 `0x80`，真索引偏移在 `0x20`）：索引明文（zlib），条目名 = `md5(UTF-16LE 全路径)`，`adlr` = `adler32(明文)`，**条目内容** Cx 加密。参数在 `resource/cx/profile_9nine.json`，`tool/cx.py` 可离线加解密（不是 Hxv4！详见 `doc/lessons-learned.md` §1） |
-| 民汉归档 | `archive/releases/unencrypted.xp3` **明文 xp3**（`adlr=0`），17 个 scn + 贴图 + help，每个文件登记三个别名（全路径 / basename / `md5(UTF-16LE 全路径)`） |
-| 初版补丁 | `archive/` 存有作者初版补丁：文本 + 设置页 + 字体，用 `version.dll`（KirikiriUnencryptedArchive）+ `unencrypted.xp3`；本项目**只按需采纳**，不继承其结构 |
+| 民汉文本 | 樱空汉化组 Ver1.0 简中文本，已入库 `resource/chs_text`（一脚本一文件）；官方三轨语料在 `resource/official_{jp,en,cn}`。另有 `adlr=0` 的**明文 xp3 变体**（三别名、索引不压缩，需 `version.dll` 才能读），本项目只把它当格式对照，交付物一律 Cx 加密包 |
 | 回写方式 | 一步：`script/extend_lang.py` 用 `tool/psb.PsbGraph` 整图重排（`parse_graph()` → `build()`）追加第 4 块，官方三块一个字节不动，零改动重建逐字节一致（早期「覆盖 cn 轨」的 `writeback.py` 路径已废弃删除，仅存 git 历史） |
 
 细节见 `doc/`：`file-formats.md`（容器/PSB）、`text-model.md`（本文模型）、`engine-mechanics.md`（启动链/优先级/语言轨/字体）、`lessons-learned.md`、`acceptance-criteria.md`。

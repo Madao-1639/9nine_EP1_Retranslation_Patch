@@ -3,14 +3,14 @@
 > ⚠️ 语料是唯一来源：`resource/chs_text` 与 `resource/official_{jp,en,cn}` 已入库并经人工修订
 > （繁体字形、显示名、选项译文，见 `doc/text-model.md` §4/§6）。重跑 `--lang cn` 会把 `resource/chs_text`
 > 覆盖回民汉原件，重跑官方侧会覆盖 `resource/official_*`；要改文本请直接改语料。
-> 需要重新提取时再看这个脚本，它是从 `archive/releases/unencrypted.xp3` / 官方 scn 出发的参考实现。
+> 需要重新提取时再看这个脚本，它是从明文包 `unencrypted.xp3` / 官方 scn 出发的参考实现（明文包不随仓库分发）。
 
 实现：把一条语言轨的脚本正文提取成按脚本分片的文本集。
 
 用法（从项目根执行）：
 
-    # 明文 xp3（archive/ 里的初版补丁包）
-    mamba run -n GalRev python script/extract_text.py --from-xp3 archive/releases/unencrypted.xp3 \\
+    # 明文 xp3（不随仓库分发）
+    mamba run -n GalRev python script/extract_text.py --from-xp3 <明文包>/unencrypted.xp3 \\
         --lang cn --out resource/chs_text
 
     # 松散目录（GARbro 导出的官方 scn/，或任何解包产物）

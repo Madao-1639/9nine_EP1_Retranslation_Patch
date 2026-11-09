@@ -2,7 +2,6 @@ __pycache__/
 *.pyc
 tmp/
 releases/
-archive/
 
 # 官方解包/提取产物（游戏本体内容，可用 unpack_xp3.py + extract_text.py 重建）
 resource/official_scn/

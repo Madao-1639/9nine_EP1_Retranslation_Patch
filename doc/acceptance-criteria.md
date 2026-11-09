@@ -10,33 +10,26 @@ mamba run -n GalRev python script/unpack_xp3.py "E:/SteamLibrary/steamapps/commo
 ```
 （产物 `resource/official_scn/` 是游戏本体内容，已 gitignore，可随时重建。）
 
-## 1. 工程自检（tool/ 全部模块）
-
-```powershell
-mamba run -n GalRev python script/selftest.py
-```
-**判据**：17 项全部通过（xp3 三别名 / adlr=0 / 17 个 scn / 零改动往返 / 重建幂等 / 单串扰动 / textset 往返 / krkr_text mode 0-2 / cx 往返）。依据：`script/selftest.py`。
-
-## 2. Cx 实现与 GARbro 逐字节一致
+## 1. Cx 实现与 GARbro 逐字节一致
 
 ```powershell
 mamba run -n GalRev python script/verify_cx.py
 ```
 **判据**：5/5 黄金向量通过（scn a01/a09、startup.tjs、syslangtext_cn.ini、embfontlist.tjs）。黄金向量取自 GARbro 的 `ICrypt.Decrypt` 输出，21/21 条目逐字节一致（17 scn + startup.tjs + syslangtext_cn.ini + help_conf_cn.txt + embfontlist.tjs），回归不依赖 .NET 宿主。依据：`script/verify_cx.py`。
 
-## 3. 文本提取（两侧）
+## 2. 文本提取（两侧）
 
 > 语料是**唯一来源**：`resource/chs_text` 与 `resource/official_{jp,en,cn}` 已入库、并经人工修订（繁体字形、显示名、选项译文，见 `doc/text-model.md` §4/§6）。本节的 `script/extract_text.py` **仅留档、不参与交付**——重跑会把语料覆盖回民汉原件/官方原件，要改文本请直接改语料。
 
 ```powershell
-mamba run -n GalRev python script/extract_text.py --from-xp3 archive/releases/unencrypted.xp3 --lang cn --out resource/chs_text
+mamba run -n GalRev python script/extract_text.py --from-xp3 <明文包>/unencrypted.xp3 --lang cn --out resource/chs_text
 foreach ($l in "cn","jp","en") { mamba run -n GalRev python script/extract_text.py --from-dir resource/official_scn --lang $l --out "resource/official_$l" }
 ```
 **判据**：每侧 17 个脚本、9327 行、9 条选择支；`_index.json` 记录来源/脚本名/行数/字符数；重复运行 `_index.json` 哈希相同（幂等）。
 
 > ⚠️ `resource/chs_text` **不是**民汉原件：繁体字形、显示名、选项译文经人工修订（见 `doc/text-model.md` §4/§6）；误跑 `extract_text.py --lang cn` 会把它覆盖回民汉原件，回头要 `git checkout -- resource/chs_text` 取回修订版；正常流程不需要跑它。
 
-## 4. 行数严格一致 + 末尾行语义抽查
+## 3. 行数严格一致 + 末尾行语义抽查
 
 ```powershell
 mamba run -n GalRev python script/verify_extract.py --base resource/official_jp --target resource/chs_text --out resource/verify
@@ -45,21 +38,21 @@ mamba run -n GalRev python script/verify_extract.py --base resource/official_jp 
 
 *已知差异（非错误）*：民汉正文 `\n` 比官方日文少 498 处（简中重排段落），ruby 少 3 处。
 
-## 5. 四轨产物（`script/extend_lang.py`）
+## 4. 四轨产物（`script/extend_lang.py`）
 
 ```powershell
 mamba run -n GalRev python script/extend_lang.py --official resource/official_scn/scn --text resource/chs_text --out tmp/build/lang4
 ```
 **判据**：9327 行各追加第 4 块（`sc`）、9 条选择支各追加第 4 项；每行前 3 块逐值等于官方、第 4 块的 `name`/`text`/`plain` 等于语料、选择支前 3 项不变。依据：`script/extend_lang.py` 内置闸。
 
-## 6. 四轨产物复核（`script/verify_lang4.py`）
+## 5. 四轨产物复核（`script/verify_lang4.py`）
 
 ```powershell
 mamba run -n GalRev python script/verify_lang4.py --official resource/official_scn/scn --built tmp/build/lang4/scn --text resource/chs_text
 ```
 **判据**：`{"rows": 9327, "blocks4": 9327, "selects": 9, "text_ok": 9327, "plain_ok": 2395, "name_ok": 5900}`；另含「产物幂等（再解析再序列化逐字节一致）」与「前 3 块未改动」，问题项 0 才算过。依据：`script/verify_lang4.py`。
 
-## 7. 打包（`script/build_patch.py`）
+## 6. 打包（`script/build_patch.py`）
 
 ```powershell
 mamba run -n GalRev python script/build_patch.py --scn-dir tmp/build/lang4/scn `
@@ -67,7 +60,7 @@ mamba run -n GalRev python script/build_patch.py --scn-dir tmp/build/lang4/scn `
 ```
 **判据**：产出 `releases/patch3.xp3`（17 个四块 scn）与 `releases/steam.xp3`（官方 4 条保留 + 源码钩子 + 官方原字节码 13,976 B）；钩子里不得含 `System.inform` / `Debug.notice` / `getPlacedPath` 探针（测试构建用 `--allow-probe` 豁免）；脚本自带闸：官方条目字节不变、钩子内容正确、原字节码副本一致、patch3 回读逐条与源 scn 一致（任一不过就不写出）。索引必须每文件一条 `hnfn`（`doc/engine-mechanics.md` §3.1）。依据：`script/build_patch.py`。
 
-## 8. 交付物
+## 7. 交付物
 
 | 产物 | 说明 |
 |---|---|
@@ -77,7 +70,7 @@ mamba run -n GalRev python script/build_patch.py --scn-dir tmp/build/lang4/scn `
 
 安装：把官方 `steam.xp3` 改名 `steam.xp3.orig`（备份），复制 `steam.xp3` + `patch3.xp3` 到游戏目录，`font/` 整个目录复制成 `<游戏目录>/font/`。日常更新只换 `patch3.xp3`。`patch.xp3` / `patch2.xp3` 留给第三方补丁（钩子按顺序注册，互不冲突）。
 
-## 10. 内存判据（x32dbg 附加运行中的游戏，用其字符串搜索功能，UTF-16 编码）
+## 8. 内存判据（x32dbg 附加运行中的游戏，用其字符串搜索功能，UTF-16 编码）
 
 不下断点（本作断点即崩），只读内存即可判定四件事：
 
@@ -90,7 +83,7 @@ mamba run -n GalRev python script/build_patch.py --scn-dir tmp/build/lang4/scn `
 
 结论：`patch.xp3` / `steam.xp3` / `system.xp3` 都被成功注册，但**同名文件输给 `data.xp3`**；append 清单分支从未执行。
 
-## 11. hook 注入判据
+## 9. hook 注入判据
 
 `steam.xp3`（19 KB）内把 `steam_r18hack.tjs` 换成 TJS 源码钩子（官方字节码改名保留并转发），判定依据三条：
 
@@ -98,7 +91,7 @@ mamba run -n GalRev python script/build_patch.py --scn-dir tmp/build/lang4/scn `
 2. 正文第一句 `a01` scene0 row0 = 「有一部名为《轮回转生的莫比乌斯环》的动画。」→ `addAutoPath("steam.xp3>scn/")` 生效，**压过 `data.xp3`**；
 3. 副作用与处理：先 `addAutoPath` 后转发时语言回落英文（`multiLangFirstTag="en"`）→ 改为**先转发、后注册**即恢复；首次启动仍需在设置里切一次「繁體中文」。
 
-## 12. 纯追加归档的排除结论
+## 10. 纯追加归档的排除结论
 
 | 名字/形态 | 结论 |
 |---|---|
@@ -112,7 +105,7 @@ mamba run -n GalRev python script/build_patch.py --scn-dir tmp/build/lang4/scn `
 
 即：**必须有一个由引擎执行的注入点**；本作可用的只有 `steam.xp3` 里的 `steam_r18hack.tjs`。
 
-## 13. UI 简中闸（`script/verify_ui_sc.py`）
+## 11. UI 简中闸（`script/verify_ui_sc.py`）
 
 ```powershell
 mamba run -n GalRev python script/verify_ui_sc.py `
@@ -126,13 +119,13 @@ mamba run -n GalRev python script/verify_ui_sc.py `
 2. `main/syslangtext_sc.ini` 的 `!section` 结构、键序、行数与官方 `syslangtext_cn.ini` 完全一致，
    且 `textLanguageMenuItem_cn`/`subLanguageMenuItem_cn` 仍是「繁体中文」、`_sc` 是「简体中文」、`EzSaveHelpText` 里保留逗号（`ezsave.tjs` 靠逗号换行）；
 3. `main/help_conf_sc.txt` 的键序与官方 `help_conf_cn.txt` 一致；
-4. 译文里没有残留繁中/日文专用字（字表 `resource/verify/ui_sc_trad_chars.txt`，由 `script/gen_ui_trad_chars.py` 生成：官方繁中 UI 文本与初版简中版逐字对齐取「被换掉的字」，再减去简中正文语料 `resource/chs_text` 的白名单；命中即说明没转干净——只作线索，最终人工比对）；
+4. 译文里没有残留繁中/日文专用字（字表 `resource/verify/ui_sc_trad_chars.txt` 为静态数据，随语料维护：官方繁中 UI 文本与既有简中 UI 文本逐字对齐取「被换掉的字」，再减去简中正文语料 `resource/chs_text` 的白名单；命中即说明没转干净——只作线索，最终人工比对）；
 5. 钩子只留「转发官方 + 槽位循环（注册 `<slot>.xp3>` 根域、加载 `<slot>_boot.tjs`）」，不含任何目录名/字体/简中逻辑；`patch3.xp3` 根目录的 `patch3_boot.tjs` 负责四条子域 + `font/` + `KAGLoadScript("sc_hook.tjs")`，`sc_hook.tjs`（归档根） 负责语言表、`LoadSysLangText(["sc"])` 与字体钩子；三者都不许带探针。
 
 配套生成/复跑：
 
 ```powershell
-mamba run -n GalRev python script/extract_ui_sc.py          # 从初版包取 20 张 pimg + 2 张 attention
+mamba run -n GalRev python script/extract_ui_sc.py          # 重抽 20 张 pimg + 2 张 attention（已入库，仅按需）
 mamba run -n GalRev python script/gen_ui_func.py            # conf_lang.func 覆盖（psd 行改 GetUIFile）
 mamba run -n GalRev python script/make_ui_lang_caption.py   # 语言页三行标题贴图 conf_lang_sc.pimg
 ```
