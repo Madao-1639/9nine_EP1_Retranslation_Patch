@@ -8,6 +8,7 @@
 - scn:        MDF 剧情脚本（.scn = `mdf\\0` + u32 + zlib + PSB）的文本模型
 - textset:    按脚本分片的文本集存储（resource/<set>/scripts/<script>.jsonl）
 - krkr_text:  Kirikiri TVP 加扰文本编解码（syslangtext / help 等，mode 0/1/2）
+- cxdec_v2:  M2「Cxdec V2」（新版 `cxdec` 插件）内容解密层：密钥由插件本体重算 + JSON 缓存，流式 XOR 复用 `cx.stream`（第 5 作，参数在 resource/cx/profile_9nine_ep5.json）
 
 来源：xp3/psb/scn 来自本机知识库 `../../../../GalRevserse/GalRev/galrev/krkr/`（2026-11-08 复制；
 引擎级结论改动需两边同步）；`cx.py` 依据 GARbro 的 `KiriKiriCx.cs` 独立移植（与 GARbro 逐字节一致）；

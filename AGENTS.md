@@ -32,6 +32,7 @@ UI 文案（`syslangtext`、`help_*`、界面贴图）**不在补丁范围**，�
 | Steam 归档 | `data.xp3` 等为 **XP3 的 Cx 加密变体**（`0x17` 处 `0x80`，真索引偏移在 `0x20`）：索引明文（zlib），条目名 = `md5(UTF-16LE 全路径)`，`adlr` = `adler32(明文)`，**条目内容** Cx 加密。参数在 `resource/cx/profile_9nine.json`，`tool/cx.py` 可离线加解密（不是 Hxv4！详见 `doc/lessons-learned.md` §1） |
 | 民汉文本 | 樱空汉化组 Ver1.0 简中文本，已入库 `resource/chs_text`（一脚本一文件）；官方三轨语料在 `resource/official_{jp,en,cn}`。另有 `adlr=0` 的**明文 xp3 变体**（三别名、索引不压缩，需 `version.dll` 才能读），本项目只把它当格式对照，交付物一律 Cx 加密包 |
 | 回写方式 | 一步：`script/extend_lang.py` 用 `tool/psb.PsbGraph` 整图重排（`parse_graph()` → `build()`）追加第 4 块，官方三块一个字节不动，零改动重建逐字节一致（早期「覆盖 cn 轨」的 `writeback.py` 路径已废弃删除，仅存 git 历史） |
+| 其它作 | 第 2–4 作与第 1 作同参数（`resource/cx/profile_9nine.json` 直接可用）。第 5 作（9-nine-NewEpisode）换了插件：两作 exe 的 `.text` 逐字节相同，差异只在 `.rdata` 内嵌的 `cxdec.tpm.dll`（`TVPSetXP3ArchiveExtractionFilter` + `DynamicCodeGen`，128 lane 运行时生成）；参数 `resource/cx/profile_9nine_ep5.json`、条目密钥缓存 `resource/cx/keys_9nine_ep5.json`、库 `tool/cxdec_v2.py`、解包 `script/unpack_ep5.py`，见 `doc/file-formats.md` §1.3 |
 
 细节见 `doc/`：`file-formats.md`（容器/PSB）、`text-model.md`（本文模型）、`engine-mechanics.md`（启动链/优先级/语言轨/字体）、`lessons-learned.md`、`acceptance-criteria.md`。
 

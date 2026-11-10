@@ -1,6 +1,6 @@
 # 容器与格式
 
-本作（9-nine-:Episode 1，appid 976390）用到的三种格式，工具实现见 `tool/`。
+本作（9-nine-:Episode 1，appid 976390）用到的三种格式，工具实现见 `tool/`；§1.3 另外记录系列第 5 作（9-nine-NewEpisode）的另一套 Cx 参数与插件。
 
 ## 1. `data.xp3`：XP3 的 **Cx 加密变体**
 
@@ -36,6 +36,45 @@
 
 另有一种普通 XP3：`adlr=0`（不加密标记），索引未压缩，同一内容登记三别名（全路径 / basename / `md5(UTF-16LE 全路径)`）。这种包引擎读不了，必须配 `version.dll`（KirikiriUnencryptedArchive），因此本项目交付物用 Cx 加密包。
 
+### 1.3 第 5 作（9-nine-NewEpisode）：Cxdec V2
+
+系列第 2–4 作与第 1 作同参数（`resource/cx/profile_9nine.json` 通用）；**第 5 作换了插件与参数**，旧 profile 解不开（实测解出签名不对）。判型仍与 §1 相同（`0x17` 处 `0x80`、索引明文 zlib、条目内容加密），差别在密钥怎么算：
+
+| 项 | 第 1 作（旧 `cxdec_tpm.dll`） | 第 5 作（新 `cxdec.tpm.dll`） |
+|---|---|---|
+| 代码位置 | 参数/程序编进 exe | 两作 exe 的 `.text` **逐字节相同**，差异只在 `.rdata` 里内嵌的一个 PE |
+| 注册方式 | `TVPRegisterStorageMedia` + 私有 `CxFilterFS` | `TVPSetXP3ArchiveExtractionFilter`（krkr 公共过滤器 API） |
+| 控制块 TABLE | 存的是**取反表**（用前再取反） | 存**原表**（`table[idx]` 直接读） |
+| 程序生成 | 固定字节码解释 | `DynamicCodeGen`：128 lane，运行时生成，`seed = lane 索引`，随机源 LCG（`flags` bit7=1 时改 MT19937） |
+| branch order 数组 | index = 随机值 | index = **form**（value 是命中该 form 的随机值；与 GARbro 的数组互为逆排列） |
+| 索引里的条目名 | `md5(UTF-16LE 全路径)` | **真名**（`scn/e01a.txt.scn`） |
+
+exe `.rdata` 内嵌模块的布局：`"module\0"` 起 16 字节名字槽 + u16(原长/256) + `0x00` + u32(zlib 长) + zlib(PE)，解出来是 32 位 PE（`TVPSetXP3ArchiveExtractionFilter` 的提供者）。
+
+模块自带两段数据（`sub_10003010` 按名字找：名字 + u16 字节长 + 数据）：
+
+* `--data--PARAMS`（22 B）：`[0:8]` even、`[8:14]` odd、`[14:17]` prolog（三者都是「按 form 索引」的排列）、`[17]` flags、`[18:20]` mask、`[20:22]` offset；
+* `TABLE`（4096 B = 1024 × u32）：控制块原表。
+
+每条目密钥（`sub_10001980`，入参 = `adlr`）：
+
+```
+lane     = adlr & 0x7F ; src = adlr >> 7
+key64_a  = exec(lane, src) | (exec(lane, ~src) << 32)   # 低 32：key3 与两处附加字节；高 32：两处位置
+base_off = offset + (adlr & mask)
+key64_b  = 同上，key = adlr ^ (adlr >> 16)
+```
+
+解密与 Cx 同一算式（两作共用 `tool/cx.py` 的 `crypt_stream`）：`[0, base_off)` 用 a 段、之后用 b 段；`pos` 落在段内才 XOR，先 zlib 解压再解密、偏移按明文累计。
+
+本作取值：`mask=0x190`、`offset=0x27E`、even `[5,3,4,7,1,2,6,0]`、odd `[3,0,1,2,5,4]`、prolog `[2,1,0]`、flags `0x00`（LCG 支路），整表见 `resource/cx/profile_9nine_ep5.json`；条目密钥缓存 `resource/cx/keys_9nine_ep5.json`（1389 条 adlr）。工具 `tool/cxdec_v2.py`，解包/校验 `script/unpack_ep5.py`。
+
+密钥必须由**插件本体**算（生成器是运行时产物，静态复现性价比低）：模块是 32 位 PE，故借 Windows 自带的 32 位 PowerShell 加载并调 `sub_10001980`（模块内地址随构建变化，记在 profile 的 `module.filter_rvas`）；算一次缓存成 JSON 后，整条流程纯 Python。
+
+判据：`bgimage/bg001a.png`（adlr `0x98DEC45C`）→ `key64_a = 0x288C4798_288C4798`、`base_off = 654`，解出 PNG 全 chunk CRC 通过、IDAT inflate 长度与 IHDR 一致（1,280×720×3+720 = 2,765,520 B）。
+
+
+打包（写回）：容器写法与第 1 作共用 `tool/xp3build.write_archive`，形态按官方包对齐——`info` 里的条目名是**真名**、**不带 `hnfn`**（第 1 作官方包是 `md5` 名 + 每文件一条 `hnfn`，两作不同，`write_archive` 的 `name_style="real"` / `emit_hnfn=False` 就是给这里用的）。内容 = `zlib.compress(encrypt(明文), 9)`，`adlr` = **明文** adler32，加密与解密同一算式（`tool/cxdec_v2.KeyCrypt` 直接喂给 `write_archive`）。改过的明文必然是新 `adlr`、也就是新密钥，所以打包要先把所有明文的 adler32 收齐、一次性调插件补算密钥（`script/pack_ep5.py --exe`），写完立刻回读逐字节比对。
 ## 2. `.scn`：裸 PSB v3
 
 本作的剧情脚本**没有** `mdf\0 + zlib` 外壳，直接是 `PSB\0`（版本 3，header_encrypt=0）。

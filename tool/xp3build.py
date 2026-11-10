@@ -11,7 +11,10 @@
 都只能命中第一个文件（实测差异根因，见 `doc/engine-mechanics.md` §3.1）。
 
 用途：容器写法只有这一份实现，打包脚本只负责决定「装哪些文件」（`script/build_patch.py`
-写 `patch3.xp3` 的 17 个四块 scn + UI 语料）。新增补丁包时直接复用它，不要另抄一份。
+写 `patch3.xp3` 的 17 个四块 scn + UI 语料；`script/pack_ep5.py` 写第 5 作的包）。新增补丁包时直接复用它，不要另抄一份。
+
+索引形态按官方包对齐：第 1 作是 `md5` 条目名 + 每文件一条 `hnfn`（默认值），第 5 作是真名 + 无 `hnfn`
+（`name_style="real"`、`emit_hnfn=False`）。
 """
 
 from __future__ import annotations
@@ -32,11 +35,21 @@ def md5_name(path: str) -> str:
     return hashlib.md5(path.encode("utf-16-le")).hexdigest()
 
 
-def write_archive(path: str, files: list[tuple[str, bytes]], crypt) -> int:
+def write_archive(path: str, files: list[tuple[str, bytes]], crypt,
+                  name_style: str = "md5", emit_hnfn: bool = True) -> int:
     """把 `[(逻辑路径, 明文)]` 写成 Cx 加密的补丁归档，返回文件大小。
 
-    `crypt` 是 `tool.cx.CxCrypt` 实例（加密参数取自 `resource/cx/profile_9nine.json`）；
-    加解密同一算式，所以同一个对象既用来读官方包也用来写补丁包。
+    `crypt` 只要实现 `crypt(adler32, 明文) -> 密文`：`tool.cx.CxCrypt`（第 1–4 作）、
+    `tool.cxdec_v2.KeyCrypt`（第 5 作）都满足；加解密同一算式，同一个对象读写通用。
+
+    `name_style` / `emit_hnfn` 决定索引形态，两作官方包不一样：
+
+    | 作 | `info` 里的条目名 | `hnfn` |
+    |---|---|---|
+    | 第 1 作（本作，`data.xp3` + 我们的 `patch3.xp3`） | `md5(UTF-16LE 路径)` | **每文件一条**（裸名/子域靠它命中） |
+    | 第 5 作（9-nine-NewEpisode 官方包） | **真名**（`scn/e01a.txt.scn`） | 无 |
+
+    `name_style` 取 `"md5"` / `"real"`；默认值与第 1 作一致，改默认会破坏既有补丁包。
     """
     out = io.BytesIO()
     out.write(xp3.XP3_SIG)
@@ -56,12 +69,13 @@ def write_archive(path: str, files: list[tuple[str, bytes]], crypt) -> int:
         placed.append((name, plain, adlr, packed, off))
 
     index = io.BytesIO()
-    for name, _plain, adlr, _packed, _off in placed:
-        hn = struct.pack("<Ih", adlr, len(name)) + name.encode("utf-16-le")
-        index.write(b"hnfn" + struct.pack("<q", len(hn)) + hn)
+    if emit_hnfn:
+        for name, _plain, adlr, _packed, _off in placed:
+            hn = struct.pack("<Ih", adlr, len(name)) + name.encode("utf-16-le")
+            index.write(b"hnfn" + struct.pack("<q", len(hn)) + hn)
 
     for name, plain, adlr, packed, off in placed:
-        nh = md5_name(name)
+        nh = md5_name(name) if name_style == "md5" else name
         nbytes = nh.encode("utf-16-le") + bytes(2)
         info = xp3.Xp3Info_t()
         info.flags = PROT

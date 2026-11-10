@@ -141,3 +141,44 @@ mamba run -n GalRev python script/make_ui_lang_caption.py   # 语言页三行标
 语言页标题的位置/样式校验：脚本会打印实测行带，期望标题行带顶端 `1/90/179`、文字左边缘 `x=25`（与官方英文原图行带一致）；预览 PNG 写在 `tmp/ui/conf_lang_sc_preview.png`。
 - 钩子/脚本解耦闸（`script/build_patch.py` + `verify_ui_sc.py` 内置）：钩子只允许「转发官方 + 注册子域 + `KAGLoadScript("sc_hook.tjs")`」；
   一旦 `LoadSysLangText` / `drawTextKinsokuRect` / `AddTrueTypeFont` 出现在钩子里即判失败（这类逻辑属于 `patch3.xp3` 的 `sc_hook.tjs`（归档根））。
+
+## 12. 其它作（第 5 作，9-nine-NewEpisode）解包闸
+
+与第 1 作并列的一套：参数 `resource/cx/profile_9nine_ep5.json`、密钥缓存 `resource/cx/keys_9nine_ep5.json`、库 `tool/cxdec_v2.py`、脚本 `script/unpack_ep5.py`（原理见 `doc/file-formats.md` §1.3）。
+
+```powershell
+# 全量只读校验（不落盘）
+mamba run -n GalRev python script/unpack_ep5.py verify <data.xp3> <steam.xp3>
+# 日常自检用单条/小包，别每次都跑全量（全量约 55 s）
+mamba run -n GalRev python script/unpack_ep5.py verify <steam.xp3>
+mamba run -n GalRev python script/unpack_ep5.py verify <data.xp3> --only bgimage/bg001a.png scn/e01a.txt.scn
+```
+
+期望（`data.xp3` + `steam.xp3` 共 1398 条，本机实测 ~55 s）：
+
+| 判型 | 条数 | 判据 |
+|---|---|---|
+| png | 558 | 签名 + 全 chunk CRC + IDAT 完整 inflate；非隔行再核 `(w×channels×depth/8+1)×h` |
+| tjs2 | 186 | `TJS2100\0` 头 + `tool/tjs2.py` 完整解析 |
+| ogg | 326 | `OggS` |
+| psb | 77 | 23 `scn` + 54 `pimg`，`PSB\0` |
+| tlg | 17 | `TLG` |
+| font | 7 | `00 01 00 00` / `OTTO` |
+| amv | 4 | `AJPM` |
+| text | 223 | 加扰文本解扰成功，或 UTF-8 / cp932 可解码（`rule` 外的 `.txt` 是 Shift-JIS） |
+| **BAD** | **0** | 出现任何 `* BAD` 即判失败 |
+
+密钥闸：缓存命中时不需要 exe；缓存缺条目时用 `keys` 子命令调插件本体重算并写回缓存（`mamba run -n GalRev python script/unpack_ep5.py keys <nine_newEP.exe> <xp3...>`），重算后仍要跑一遍 `verify` 且 BAD = 0。
+
+打包往返闸（`script/pack_ep5.py`）：
+
+```powershell
+mamba run -n GalRev python script/pack_ep5.py <out.xp3> <srcdir> --exe <nine_newEP.exe>
+```
+
+一次性全量打包与「同一内容重打包」都要通过：
+
+1. 回读产物：重新解析 → 逐条解密 → 与输入明文**逐字节一致**（脚本内置，不通过即退出码 1）；
+2. 索引里每条 `adlr` == `adler32(明文)`，且条目带加密标记（`info.flags & 0x80000000`）；
+3. 产物再过一遍 `verify`，判型全 ok、`* BAD` = 0（本机实测：5 条样例，含 `.png`/`.scn`/加扰文本）；
+4. 改过内容（新 `adlr` → 新密钥）的样例必须能在只给 `--exe` 的情况下自动补算并通过 1–3。
