@@ -279,7 +279,10 @@ foreach ($line in Get-Content $HashFile) {
 """
 
 
-def _ps32() -> str:
+_REQUIRED_RVAS = ("set_mask", "build", "gen", "g_params", "g_flag", "g_table")
+
+
+def ps32_path() -> str:
     """Windows 自带的 32 位 PowerShell（模块是 32 位 PE，必须在 32 位进程里加载）。"""
     path = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"),
                         "SysWOW64", "WindowsPowerShell", "v1.0", "powershell.exe")
@@ -293,8 +296,7 @@ def derive_keys(scheme: Scheme, module: bytes, adlrs, workdir: str | None = None
 
     返回 `{adlr: (key64_a, key64_b, base_offset)}`。
     """
-    rvas = scheme.filter_rvas
-    missing = [k for k in ("set_mask", "build", "gen", "g_params", "g_flag", "g_table") if k not in rvas]
+    missing = [k for k in _REQUIRED_RVAS if k not in scheme.filter_rvas]
     if missing:
         raise ValueError(f"filter_rvas 缺字段: {missing}")
     own_dir = workdir is None
@@ -310,11 +312,11 @@ def derive_keys(scheme: Scheme, module: bytes, adlrs, workdir: str | None = None
         out_path = os.path.join(workdir, "keys_raw.txt")
         ps_path = os.path.join(workdir, "dump_keys.ps1")
         src = _PS_TEMPLATE
-        for key, rva in rvas.items():
+        for key, rva in scheme.filter_rvas.items():
             src = src.replace(f"__{key.upper()}__", f"{rva:#x}")
         with open(ps_path, "w", encoding="utf-8") as fp:
             fp.write(src)
-        res = subprocess.run([_ps32(), "-NoProfile", "-ExecutionPolicy", "Bypass",
+        res = subprocess.run([ps32_path(), "-NoProfile", "-ExecutionPolicy", "Bypass",
                               "-File", ps_path, "-Dll", dll_path,
                               "-Out", out_path, "-HashFile", hash_path],
                              capture_output=True, text=True)
