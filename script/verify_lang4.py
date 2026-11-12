@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -27,7 +26,7 @@ from tool import mdf, psb, textset
 
 
 def plain_of(text: str) -> str:
-    return re.sub(r"\[([^\[\]]+),(\d+)\]", lambda m: m.group(1), text or "").replace("\\n", "")
+    return mdf.plain_of(text or "")
 
 
 def main(argv=None) -> int:
@@ -97,7 +96,8 @@ def main(argv=None) -> int:
             else:
                 problems.append({"script": script, "kind": "sc_text_mismatch", "key": key})
             if b.blocks[3].plains:
-                if b.blocks[3].plains[0][0] == plain_of(want_text):
+                want_plain = mdf.plain_variants(want_text or "")
+                if tuple(v for v, _ in b.blocks[3].plains) == want_plain:
                     totals["plain_ok"] += 1
                 else:
                     problems.append({"script": script, "kind": "sc_plain_mismatch", "key": key})

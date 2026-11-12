@@ -17,8 +17,15 @@
 
     [0] name          该语言下的角色显示名（"コスプレイヤー" / "Cosplayer" / "角色扮演者"）
     [1] text          正文（含行内标记 `%NNN;` / `#RRGGBBAA;` / `#;`、ruby `[よみ,3]`、换行 `\\n`）
-    [2] plain         正文去掉 ruby 后的形态（arity 4 才有；因为有 `\\n`、与 [1] 不同槽时占多数）
-    [3] plain2        正文只保留 ruby 基字的形态（与 [2] 通常同槽；4836/4839 相同，仅 3 处不同）
+    [2] plain         正文的**读音版**：ruby 展开成读音、删行内标记、删换行
+    [3] plain2        正文的**基字版**：ruby 展开成基字、删行内标记、删换行
+
+    arity 触发条件：正文含任何行内标记（换行或 `%…;` / `#…;`）→ arity 4；否则 arity 2。
+    无 ruby 时 [2]/[3] 同值，官方存**同一个字符串槽**；全作只有 3 行有 ruby（jp 轨），
+    这 3 行 [2]/[3] 才分槽。规则实现与 oracle：`tool.mdf.plain_variants()`（4839/4839 命中）。
+
+ruby 语法细则（容易搞错，样本只有 3 处）：`[よみ,N]` 后面紧跟的 **N+1** 个字是基字，
+N 不是基字总数：`[しろみつがわ,3]白巳津川` → 读音 7 字、基字 3 字 = 3+1。
 
 选择支 `scenes[].selects[i]`（实测 9 条）：
 
@@ -41,12 +48,51 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from . import psb
 
 LANGS = ("jp", "en", "cn", "sc")  # 前三轨是官方；"sc" 是简中补丁新增的第 4 轨
 LANG_INDEX = {name: i for i, name in enumerate(LANGS)}
+
+# 行内标记：`%p-1;` / `%fＭＳ ゴシック;` / `%fuser;`、颜色 `#RRGGBBAA;` / 重置 `#;`
+MARKUP = re.compile(r"%[^%;]*;|#[0-9A-Fa-f]{6,8};|#;")
+# ruby：`[よみ,N]` + 其后 N+1 个字是基字（N 是「读音字数-1」，不是基字总数）
+RUBY = re.compile(r"\[([^\[\]]+),(\d+)\]")
+NEWLINE = "\\n"  # 字面反斜杠 + n，引擎的换行标记
+
+
+def plain_variants(text: str) -> tuple[str, str]:
+    """正文 → 两个 plain 变体（规则由官方 4839 个 arity-4 块反推，命中 4839/4839）。
+
+    * 第一个（`plain`）：ruby 展开成**读音**（`[しろみつがわ,3]白巳津川` → `しろみつがわ`）
+    * 第二个（`plain2`）：ruby 展开成**基字**（同上 → `白巳津川`）
+
+    两者都删行内标记（`%…;` / `#…;`）与换行。无 ruby 时两者同值，官方存同一个槽。
+    """
+    read, base, i = [], [], 0
+    while i < len(text):
+        m = RUBY.match(text, i)
+        if m:
+            end = m.end() + int(m.group(2)) + 1
+            read.append(m.group(1))
+            base.append(text[m.end():end])
+            i = end
+            continue
+        read.append(text[i])
+        base.append(text[i])
+        i += 1
+
+    def strip(s: str) -> str:
+        return MARKUP.sub("", s).replace(NEWLINE, "")
+
+    return strip("".join(read)), strip("".join(base))
+
+
+def plain_of(text: str) -> str:
+    """只取第一个 plain 变体（读音版）；无 ruby 时即「去行内标记、去换行」的裸文本。"""
+    return plain_variants(text or "")[0]
 
 
 def _s(node):

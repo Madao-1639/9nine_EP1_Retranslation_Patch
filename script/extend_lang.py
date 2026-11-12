@@ -34,9 +34,8 @@ from tool.psb import PsbGraph, split_path
 
 
 def plain_of(text: str) -> str:
-    """plain 变体：去掉 `\\n`，ruby 只保留基字（与 `tool/mdf.py` 的取值规则一致）。"""
-    import re
-    return re.sub(r"\[([^\[\]]+),(\d+)\]", lambda m: m.group(1), text).replace("\\n", "")
+    """第 4 块的 plain（读音版）；规则实现与 oracle 见 `tool.mdf.plain_variants()`。"""
+    return mdf.plain_of(text)
 
 
 def str_width_for(graph: PsbGraph, extra: int = 0) -> int:
@@ -93,8 +92,10 @@ def extend_script(script: str, raw: bytes, rows: list[dict], selects: list[dict]
             if marker and si == 0 and ri == 0:
                 text = marker + text
             name = rec.get("name")
-            plain = plain_of(text)
-            # 语言块是列表：[0] 显示名、[1] 正文、[2..] plain
+            variants = mdf.plain_variants(text)
+            # 语言块是列表：[0] 显示名、[1] 正文、[2..] plain…
+            # 两个 plain 变体（读音版 / 基字版）同值时官方存同一个槽，这里照传统一。
+            plain_nodes: dict[str, psb.PNode] = {}
             for pos, child in enumerate(cn_block.children):
                 if pos == 0:
                     if child.kind == "str" and name is not None:
@@ -106,8 +107,13 @@ def extend_script(script: str, raw: bytes, rows: list[dict], selects: list[dict]
                     new_block.children.append(graph.str_node(text, width))
                     stats["text"] += 1
                 else:
-                    new_block.children.append(graph.str_node(plain, width))
-                    stats["plain"] += 1
+                    value = variants[pos - 2] if pos - 2 < len(variants) else variants[-1]
+                    node = plain_nodes.get(value)
+                    if node is None:
+                        node = graph.str_node(value, width)
+                        plain_nodes[value] = node
+                        stats["plain"] += 1
+                    new_block.children.append(node)
             if len(new_block.children) != arity:
                 raise psb.PsbError(f"{script}: scene{si} row{ri} 新块 arity {len(new_block.children)} != {arity}")
             blocks.children.append(new_block)
@@ -162,8 +168,12 @@ def extend_script(script: str, raw: bytes, rows: list[dict], selects: list[dict]
         want = (marker + rec["text"]) if (marker and msg.scene == 0 and msg.row == 0) else rec["text"]
         if blocks[3].text != want:
             raise psb.PsbError(f"{script}: scene{msg.scene} row{msg.row} chs 正文不符")
-        if blocks[3].plains and blocks[3].plains[0][0] != plain_of(want):
-            raise psb.PsbError(f"{script}: scene{msg.scene} row{msg.row} chs plain 不符")
+        if blocks[3].plains:
+            want_plain = mdf.plain_variants(want)
+            got = tuple(v for v, _ in blocks[3].plains)
+            if got != want_plain:
+                raise psb.PsbError(
+                    f"{script}: scene{msg.scene} row{msg.row} chs plain 不符：{got!r} != {want_plain!r}")
         seen += 1
     if seen != len(by_key):
         raise psb.PsbError(f"{script}: 产物行数 {seen} != 语料 {len(by_key)}")

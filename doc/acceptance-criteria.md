@@ -43,14 +43,14 @@ mamba run -n GalRev python script/verify_extract.py --base resource/official_jp 
 ```powershell
 mamba run -n GalRev python script/extend_lang.py --official resource/official_scn/scn --text resource/chs_text --out tmp/build/lang4
 ```
-**判据**：9327 行各追加第 4 块（`sc`）、9 条选择支各追加第 4 项；每行前 3 块逐值等于官方、第 4 块的 `name`/`text`/`plain` 等于语料、选择支前 3 项不变。依据：`script/extend_lang.py` 内置闸。
+**判据**：9327 行各追加第 4 块（`sc`）、9 条选择支各追加第 4 项；每行前 3 块逐值等于官方、第 4 块的 `name`/`text`/`plain` 等于语料、选择支前 3 项不变。第 4 块的 arity **照抄 cn 块**（不按译文是否含标记判断），两个 plain 变体同值时**共用一槽**。`plain` 用 `tool.mdf.plain_variants()` 校验（读音版/基字版，含删 `%…;` 控制码）。依据：`script/extend_lang.py` 内置闸 + `script/verify_plain.py`（官方 oracle 4839/4839）。
 
 ## 5. 四轨产物复核（`script/verify_lang4.py`）
 
 ```powershell
 mamba run -n GalRev python script/verify_lang4.py --official resource/official_scn/scn --built tmp/build/lang4/scn --text resource/chs_text
 ```
-**判据**：`{"rows": 9327, "blocks4": 9327, "selects": 9, "text_ok": 9327, "plain_ok": 2395, "name_ok": 5900}`；另含「产物幂等（再解析再序列化逐字节一致）」与「前 3 块未改动」，问题项 0 才算过。依据：`script/verify_lang4.py`。
+**判据**：`{"rows": 9327, "blocks4": 9327, "selects": 9, "text_ok": 9327, "plain_ok": 2395, "name_ok": 5900}`；另含「产物幂等（再解析再序列化逐字节一致）」与「前 3 块未改动」，问题项 0 才算过。`plain_ok` 校验两个槽（读音版/基字版），不只第一个。依据：`script/verify_lang4.py`。
 
 ## 6. 打包（`script/build_patch.py`）
 
