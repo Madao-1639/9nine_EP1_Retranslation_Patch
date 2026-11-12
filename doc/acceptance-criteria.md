@@ -52,6 +52,16 @@ mamba run -n GalRev python script/verify_lang4.py --official resource/official_s
 ```
 **判据**：`{"rows": 9327, "blocks4": 9327, "selects": 9, "text_ok": 9327, "plain_ok": 2395, "name_ok": 5900}`；另含「产物幂等（再解析再序列化逐字节一致）」与「前 3 块未改动」，问题项 0 才算过。`plain_ok` 校验两个槽（读音版/基字版），不只第一个。依据：`script/verify_lang4.py`。
 
+## 5.5 界面贴图改字
+
+界面贴图里的文字是烘死位图的，改它等于改图。流程与判据：
+
+1. TLG6 解 PNG（GARbro `TlgFormat.Read`；`tool/tlg.py` 只有 TLG5）；
+2. 按原字体（华康圆体 W9）/字号/颜色重排，画布与对齐按 `engine-mechanics.md` §5.7 的规则；
+3. TLG5 编码写回 v2 容器的目标 chunk（布局见 `file-formats.md` §5.2）。
+
+**判据**：容器零改动往返逐字节一致；只有目标 chunk 变化（其它 chunk 逐字节相同）；回读解码与源 PNG 逐像素一致（含 alpha）；同一文件重跑一遍得到相同字节（幂等）。依据：本次 v1.3.2 的 36 个 chunk 全部满足（5 个 pimg：`conf_sys_sc` / `conf_dlg_sc` / `conf_key_sc` / `dialog_sc` / `message_sc`）。
+
 ## 6. 打包（`script/build_patch.py`）
 
 ```powershell

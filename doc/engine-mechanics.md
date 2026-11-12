@@ -388,7 +388,16 @@ UI 文案与剧情脚本走**两套完全不同**的通路，别混着排查。
 
 **② 界面贴图（`uipsd/*.pimg` + `uipsd/*.func`）**
 
-- `.pimg` = PSB v3：`layers` 里每个图层的位图是一份 chunk 资源，键名 = `<layer_id>.tlg`（结构见 `file-formats.md` §5）。
+- `.pimg` = PSB v3：`layers` 里每个图层的位图是一份 chunk 资源，键名 = `<layer_id>.tlg`（结构见 `file-formats.md` §5）。**但樱空素材的 `uipsd/sc/*_sc.pimg` 是 v2 + TLG6**（容器布局见 `file-formats.md` §5.2）。
+- 设置页/确认对话框里的**标签文字是烘死在位图上的**，`syslangtext` / `help` 里搜不到。判断方法：先在 `main/*.ini|txt` 里搜不到关键词，就用 OCR（Windows `Windows.Media.Ocr`，先用 System.Drawing 把透明图分别叠白/黑底再识别）扫一遍 `uipsd/sc/*_sc.pimg` 解出来的 PNG。
+- 改字流程：TLG6 解 PNG（GARbro `TlgFormat`）→ 按原字体/字号重排 → TLG5 编码写回对应 chunk（v2 容器重排见 `file-formats.md` §5.2）。这一步是**一次性脚本**（`tmp/`，不入库）；写回后必须自带两道校验：只动目标 chunk（其它 chunk 逐字节不变）、回读解码与源 PNG 逐像素一致（含 alpha）。
+- 改字的源 PNG（整幅贴图）也留在 `tmp/`，**不要放 `resource/ui_sc/` 里**——那个目录会被整目录装进 `patch3.xp3`。
+- **对齐规则（实机反馈过的坑，两条别混）**：
+  * 确认框（`dialog_sc` 的「确定…吗」这一系）：整句**居中**——按原文字中心摆，短句改短后若只保左边界，画面里会明显偏左。
+  * 游戏内菜单栏（`message_sc`）：**紧裁画布 + 文字起于 x=0**，照官方 `uipsd/cn/message_cn.pimg` 的形态。民汉那 20 张是「文字在画布内居中、左右留白 19–60 不等」，按固定位置贴图时同一列就会参差；官方繁中反而是每张紧贴文字（chunk 4–20 几乎都是 ink 起点 0）。改字后必须重裁，不能只改文字。
+  * 设置页列表（`conf_*_sc_3` 这类整页标签图）：原地改字、**保留项目符号与列位置**，按原文字左边界摆；只改 key（设置名），value（ON/OFF、数值按钮）在别的 chunk，不要动。
+- 字号建议**自动反解**：同一段文字的渲染墨迹宽度与原图墨迹宽度最接近的那个字号就是原字号（一次性脚本里就是这么做的），比逐一目测可靠。
+- 字体建议用**华康圆体 W9**，字号 16 px（设置页/确认页）、15 px（游戏内菜单栏与确认框）、17–18 px（快捷键页，逐行不同）。直接 16 px GDI+ 渲染会比原图粗约 20%，可行参数是**4 倍超采样 + 每像素 alpha 减 40 + 盒式降采样**（实测墨量 1.00×、二值 IoU 0.706）；`TextRenderingHint` 选 `AntiAlias` 或 `AntiAliasGridFit` 均可。
 - `.func` 是 KAG 的 UI 布局脚本，**同样是 TVP 加扰文本（mode 1）**，首行 `psd,<名字>` 决定用哪张图；写成 `psd,&GetUIFile("名字")` 才按当前 UI 语言找变体。
 - 变体规则即 `custom.tjs` 的 `GetUIFile`：`<chop>_<CurrentLanguageUITag><ext>` 存在则用，否则回落原名。目录子域由 `system/initialize.tjs` 的 `setupSubFolders(["uipsd/en", "uipsd/cn", ...])` 注册（只注册**目录**，不注册同名 xp3）。
 - 因此第 4 轨要新增 `uipsd/sc/<名>_sc.pimg`，并在钩子里 `addAutoPath("patch3.xp3>uipsd/sc/")`；`main/`（syslangtext、help）与 `image/`（`attention_sc.png`）同理。运行时逻辑（含 `LoadSysLangText` 补载、字体）在 `patch3.xp3` 的 `sc_hook.tjs`（归档根），见 §4.1。

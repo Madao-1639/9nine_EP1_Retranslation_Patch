@@ -108,7 +108,25 @@ PSB 头 `0x28` 处 4 字节是 checksum。**注意**：现存的 scn checksum �
 
 界面贴图（`uipsd/*.pimg`）是 PSB v3，对象图里 `layers[]` 描述图层，位图本身放在**chunk 资源区**：每个图层一份，键名 `<layer_id>.tlg`，内容是该层位图的 TLG5。
 
+**但民汉素材里的 20 张 `uipsd/sc/*_sc.pimg` 是 PSB v2**（头部没有 `header_length`，`tool/psb.py` 会报 `unsupported PSB version 2`），见 §5.2。
+
 PSB 的 chunk 表在对象图之后：`chunk_offsets`（相对 chunk 数据区起点）、`chunk_lengths`、然后 chunk 数据区。**官方打包器把每个 chunk 起点按 4 字节对齐**，两张表后面还有一段对齐填充（例：`uipsd/conf_lang.pimg` 表区 35 字节 = 17 + 18，chunk 起点 0/704/1412/…，全部 4 的倍数）。改资源时对齐和填充都要照抄，否则「原样替换」都不能逐字节往返。`tool/psb.PsbFile.replace_resources()`实现这套重排（零改动往返、同内容替换都逐字节一致）。
+
+### 5.2 v2 容器（民汉素材）
+
+v2 只有 7 个 u32，第 5/6/7 个才是三个 chunk 偏移：
+
+```
+0x00 "PSB\0" | 0x04 u16 version(=2) | 0x06 u16 encrypt
+0x08 u32 ×7：前四个与 names / strings 有关（改贴图用不到），
+              [4] chunk_offsets  [5] chunk_lengths  [6] chunk_data
+```
+
+与 v3 的差别：**chunk 数据在文件尾部**（其后只剩 16 B 尾巴），对象图在数据区之前。所以替换某个 chunk 只改两个整数阵列 + 尾部数据，其余字节一个不动（两个阵列的字段宽度不能变，否则拒绝写出）。实测 20 张 `_sc.pimg` 按此法零改动往返 **20/20 逐字节一致**。
+
+> 容器读写与重编码是一次性脚本（`tmp/`，任务结束即清理，不随仓库分发）。要重做时照上面的布局自己写：解析两个阵列 → 算新 offsets/lengths → 拼 `head + off_arr + len_arr + 新 chunk 数据 + tail`。
+
+注意：chunk 数据的 TLG 是 **TLG6**（`TLG0.0` 魔数），而 `tool/tlg.py` 只实现 TLG5 编解码。官方繁中变体（`data.xp3` 里的 `uipsd/cn/*_cn.pimg`）是 PSB **v3 + TLG5**，可以直接用 `tool/psb.py` + `tool/tlg.py` 读出来当**对齐基准**（改 sc 版贴图时用它对齐左边界/画布裁切方式）。改图时先把 TLG6 解成 PNG（用 GARbro 的 `TlgFormat.Read`，本仓库不往里加 TLG6 解码器），改完再以 **TLG5** 写回 —— 引擎两种都读（官方 v3 pimg 本身就是 TLG5）。
 
 ### 5.1 TLG5（`TLG5.0\0raw\x1a`）
 
