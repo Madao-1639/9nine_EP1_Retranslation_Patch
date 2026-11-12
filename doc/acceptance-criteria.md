@@ -60,7 +60,7 @@ mamba run -n GalRev python script/verify_lang4.py --official resource/official_s
 2. 按原字体（华康圆体 W9）/字号/颜色重排，画布与对齐按 `engine-mechanics.md` §5.7 的规则；
 3. TLG5 编码写回 v2 容器的目标 chunk（布局见 `file-formats.md` §5.2）。
 
-**判据**：容器零改动往返逐字节一致；只有目标 chunk 变化（其它 chunk 逐字节相同）；回读解码与源 PNG 逐像素一致（含 alpha）；同一文件重跑一遍得到相同字节（幂等）。依据：本次 v1.3.2 的 36 个 chunk 全部满足（5 个 pimg：`conf_sys_sc` / `conf_dlg_sc` / `conf_key_sc` / `dialog_sc` / `message_sc`）。
+**判据**：容器零改动往返逐字节一致；只有目标 chunk 变化（其它 chunk 逐字节相同）；回读解码与源 PNG 逐像素一致（含 alpha）；同一文件重跑一遍得到相同字节（幂等）。依据：`file-formats.md` §5.2 的容器布局 + 上述四条断言。
 
 ## 6. 打包（`script/build_patch.py`）
 
@@ -75,7 +75,7 @@ mamba run -n GalRev python script/build_patch.py --scn-dir tmp/build/lang4/scn `
 | 产物 | 说明 |
 |---|---|
 | `releases/steam.xp3` | **hook 注入**（约 20 KB）：官方 4 条 + `steam_r18hack.tjs` 源码钩子（注册 `patch3.xp3>scn/`、松散 `scn/`/`font/`、四轨语言表、运行期注册字体）+ `steam_r18hack_orig.tjs`（官方字节码） |
-| `releases/patch3.xp3` | **简中剧本**（约 2.2 MB）：`scn/a01..a17.txt.scn` 17 个四块脚本；索引每文件一条 `hnfn`（`doc/engine-mechanics.md` §3.1） |
+| `releases/patch3.xp3` | **简中剧本 + UI 语料**（约 12 MB）：`scn/a01..a17.txt.scn` 17 个四块脚本；索引每文件一条 `hnfn`（`doc/engine-mechanics.md` §3.1） |
 | `releases/font/` | **思源黑体 CN**（Bold/Medium，OFL，约 17 MB）：运行期由钩子注册成 `9nineSC-B/M`（`doc/engine-mechanics.md` §6） |
 
 安装：把官方 `steam.xp3` 改名 `steam.xp3.orig`（备份），复制 `steam.xp3` + `patch3.xp3` 到游戏目录，`font/` 整个目录复制成 `<游戏目录>/font/`。日常更新只换 `patch3.xp3`。`patch.xp3` / `patch2.xp3` 留给第三方补丁（钩子按顺序注册，互不冲突）。

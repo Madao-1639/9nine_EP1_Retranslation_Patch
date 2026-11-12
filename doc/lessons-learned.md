@@ -102,7 +102,7 @@
 
 ### 8.10 别把外部构建的 `patch3.xp3` 当交付物
 
-对方的包来自 `patch3.xp3` `md5 05ef50ee…` 12,172,542 B，我们的 `releases/patch3.xp3` 是 `e2976134…` 12,170,621 B——大小不同即不同构建。文本同源只能说明语料对得上，交付必须自己重跑 `extend_lang` → `build_patch` → `verify_lang4`。
+外部拿到/别人给的 `patch3.xp3`，md5 与大小只要与 `releases/` 不一致就说明是不同构建——文本同源只能说明语料对得上。交付必须自己重跑 `extend_lang` → `build_patch` → `verify_lang4`，不要拿外部包当交付物。
 
 ### 8.11 plain/plain2 的真实语义：读音版 vs 基字版，且必须删控制码
 
