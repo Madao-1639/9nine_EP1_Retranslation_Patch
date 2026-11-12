@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Kirikiri2 TVP text-stream scrambler (FE FE mode 0/1/2).
 
 Header: FE FE <mode> FF FE
