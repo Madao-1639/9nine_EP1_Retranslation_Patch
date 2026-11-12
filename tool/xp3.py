@@ -132,8 +132,8 @@ def update_adler32(data: memoryview, adler: int) -> int:
 
 def decrypt_text(data: memoryview, enc_type=1) -> memoryview:
     if enc_type == 2:
-        zsize, fsize = struct.unpack("<qq", data)
-        return memoryview(zlib.decompress(data[16:]))
+        zsize, fsize = struct.unpack_from("<qq", data)
+        return memoryview(zlib.decompress(data[16: 16 + zsize]))
 
     outio = io.BytesIO()
     outio.write(b"\xff\xfe")

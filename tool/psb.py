@@ -525,8 +525,9 @@ class PsbFile:
         # 官方打包器在两张表后面留对齐填充；照抄同样的空隙长度，保证零改动可往返
         orig_tables = self.offset_chunk_data - self.offset_chunk_offsets
         pad = orig_tables - (len(offs_blob) + len(lens_blob))
-        if pad > 0:
-            lens_blob += bytes(pad)
+        if pad < 0:
+            raise PsbError(f"chunk 表比原表大 {-pad} 字节，无法保持布局")
+        lens_blob += bytes(pad)
 
         prefix = self.body[: self.offset_chunk_offsets]
         offset_chunk_lengths = self.offset_chunk_offsets + len(offs_blob)
