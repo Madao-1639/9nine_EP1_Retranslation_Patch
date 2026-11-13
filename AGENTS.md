@@ -34,9 +34,9 @@ UI 文案（`syslangtext`、`help_*`、界面贴图）**不在补丁范围**，�
 | 回写方式 | 一步：`script/extend_lang.py` 用 `tool/psb.PsbGraph` 整图重排（`parse_graph()` → `build()`）追加第 4 块，官方三块一个字节不动，零改动重建逐字节一致（早期「覆盖 cn 轨」的 `writeback.py` 路径已废弃删除，仅存 git 历史） |
 | 其它作 | 第 2–4 作与第 1 作同参数（`resource/cx/profile_9nine.json` 直接可用）。第 5 作（9-nine-NewEpisode）换了插件：两作 exe 的 `.text` 逐字节相同，差异只在 `.rdata` 内嵌的 `cxdec.tpm.dll`（`TVPSetXP3ArchiveExtractionFilter` + `DynamicCodeGen`，128 lane 运行时生成）；参数 `resource/cx/profile_9nine_ep5.json`、条目密钥缓存 `resource/cx/keys_9nine_ep5.json`、库 `tool/cxdec_v2.py`、解包 `script/unpack_ep5.py`，见 `doc/file-formats.md` §1.3 |
 
-细节见 `doc/`：`file-formats.md`（容器/PSB）、`text-model.md`（本文模型）、`engine-mechanics.md`（启动链/优先级/语言轨/字体）、`lessons-learned.md`、`acceptance-criteria.md`。
+细节见 `doc/`：`file-formats.md`（容器/PSB）、`text-model.md`（本文模型）、`engine-mechanics.md`（启动链/优先级/语言轨/字体）、`ui-textures.md`（界面贴图的换字规格）、`lessons-learned.md`、`acceptance-criteria.md`。
 
-> 引擎级通用结论另有一份在本机知识库 `../../../../GalRevserse/GalRev/docs/engines/krkr/`（配套库 `galrev/krkr/`）。`tool/` 里 xp3/psb/scn 是从该库复制的（cx 依据 GARbro 独立移植），改动引擎级结论要**两边同步**；本项目专属取值只写在本仓库 `doc/`。
+> 引擎级通用结论另有一份在本机知识库 `<GalRev 知识库>/GalRev/docs/engines/krkr/`（配套库 `galrev/krkr/`；本机路径见 `AGENTS.local.md`）。`tool/` 里 xp3/psb/scn 是从该库复制的（cx 依据 GARbro 独立移植），改动引擎级结论要**两边同步**；本项目专属取值只写在本仓库 `doc/`。
 
 ## 工程约定
 
@@ -49,17 +49,20 @@ UI 文案（`syslangtext`、`help_*`、界面贴图）**不在补丁范围**，�
 | 容器/加密/PSB 细节 | `doc/file-formats.md` |
 | 脚本文本模型、可翻译范围 | `doc/text-model.md` |
 | 引擎行为、合法归档名、优先级、hook 注入、SOP、内存判据、字体 | `doc/engine-mechanics.md` |
+| 界面贴图换字：每页字体/字号/光栅化参数、对齐、擦除窗口、交付清单 | `doc/ui-textures.md` |
 | 踩坑与返工教训 | `doc/lessons-learned.md` |
 | 验收标准与复跑方式 | `doc/acceptance-criteria.md` |
 
 文档只写**当前成立的最新结论**，每条结论必须带验证依据（可复跑的命令或文件指针）。
+
+**去隐私化：本机路径不进跟踪文件**。`AGENTS.md`、`doc/`、`resource/` 与脚本示例里的路径一律相对项目根，或写占位符（`<游戏目录>` / `<GARbro 目录>` / `<GalRev 知识库>`）；实际取值只记在**不入库**的 `AGENTS.local.md`（`*.local.*` 已 gitignore），一次性任务用的字体等外部资源路径**不必记录**，需要时从命令行传入（`--font` / `--official-steam`）。
 
 ### 2. 目录与脚本组织
 
 ```
 tool/        长期复用的库（xp3 / cx / psb / scn / mdf / textset / krkr_text）
 script/      项目流程脚本（提取、校验、回写、打包），从项目根执行
-resource/    可复用的数据产物（文本集、清单、Cx 参数 profile）
+resource/    可复用的数据产物（文本集、清单、渲染规格 ui_labels/、Cx 参数 profile；游戏本体解包/备份放 official_*、archive/，均不入库）
 doc/         知识文档
 tmp/         临时文件，任务结束即清理（不入库）
 releases/    交付物
@@ -95,7 +98,7 @@ releases/    交付物
 - `patch3.xp3` 是本项目自己的产物，修改它不算修改原生文件；scn 交付走松散 `scn/`（见「技术背景」表的「补丁形态」行）。
 - 所有构建产物先写到项目目录（`tmp/build` → `releases/`），再按安装步骤复制进游戏目录。
 - 覆盖任何已产出补丁前先备份（`*.bak`）并在 `doc/` 记录原因。
-- 不把游戏素材（xp3、字体以外的资源）提交进仓库。
+- 不把游戏素材提交进仓库：从游戏目录提取/备份的东西（官方归档副本、解出来的 `scn`/`tjs`/字体/贴图）一律放 `resource/` 下（`resource/official_*`、`resource/archive/`），并在 `.gitignore` 里忽略。
 
 ### 6. 测试与验收
 
@@ -108,9 +111,10 @@ releases/    交付物
 - shell 初始化不可写，mamba 每次固定打印几行 `libmamba Error opening for writing ...: Permission denied`，不影响执行；批量跑时用 `2>&1 | grep -v libmamba` 过滤。
 - 依赖：全部标准库（`zlib`/`struct`/`mmap`/`hashlib`/`json`/`re`/`ctypes`）。**新增第三方库需先申请**，只在 GalRev 里装。
 - 动态分析：x32dbg（附加到运行中的游戏进程，**只读内存、不下断点** —— 本作下断点即崩）。
-- 静态分析：IDA Pro 打开脱壳文件 `nine_kokoiro.exe.unpacked.exe`（脱壳版只能用于静态分析，不能用于动态调试）。
-- 游戏目录（原生归档只读，**例外 `steam.xp3`**，见 §5）：`E:\SteamLibrary\steamapps\common\nine_kokoiro`。
-- 交叉验证用 GARbro：`../../../../GalRevserse/unpack/GARbro-v1.5.44.2904`（GUI，人工导出官方 `scn/`）。
+- 静态分析：IDA Pro 打开脱壳文件 `nine_kokoiro.exe.unpacked.exe`（脱壳版只能用于静态分析，不能用于动态调试；位置见 `AGENTS.local.md`）。
+- 游戏目录（原生归档只读，**例外 `steam.xp3`**，见 §5）：`<游戏目录>`，本机取值见 `AGENTS.local.md`。
+- 本机路径一律**不进跟踪文件**（去隐私化）：`AGENTS.md`、`doc/`、`resource/` 与脚本示例只写 `<游戏目录>` / `<GARbro 目录>` / `<GalRev 知识库>` 这类占位符，实际取值记在**不入库**的 `AGENTS.local.md`（`*.local.*` 已 gitignore）。换主机时按本节的键重建该文件。
+- 交叉验证用 GARbro：`<GARbro 目录>`（GUI，人工导出官方 `scn/`；本机路径见 `AGENTS.local.md`）。
 
 ## 参考资料
 

@@ -10,7 +10,7 @@
   1. 从官方 `uipsd/conf_lang.pimg` 里取出 `14.tlg`（= `@caps_lang/layer` 的位图）；
   2. 保留左侧圆点（x<20），把英文文字区域的 alpha 清零；
   3. 用 `script/render_ui_labels.ps1`（GDI+ + 随包思源黑体 CN Bold）把
-     `resource/ui_sc/conf_lang_labels.json` 里的简中标题渲染成透明 PNG；
+     `resource/ui_labels/conf_lang_labels.json` 里的简中标题渲染成透明 PNG；
   4. 合成后重编码 TLG，替换进 pimg，写出
      `resource/ui_sc/uipsd/sc/conf_lang_sc.pimg`；
   5. 回读校验：pimg 只有这条 chunk 变化、标题行有实际像素、其余资源逐字节一致。
@@ -122,7 +122,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--official", default="resource/official_uipsd/uipsd/conf_lang.pimg")
-    ap.add_argument("--spec", default="resource/ui_sc/conf_lang_labels.json")
+    ap.add_argument("--spec", default="resource/ui_labels/conf_lang_labels.json")
     ap.add_argument("--out", default="resource/ui_sc/uipsd/sc/conf_lang_sc.pimg")
     ap.add_argument("--font", default="", help="覆盖 JSON 里的字体文件（TTF/OTF/TTC，取第一个字族）")
     ap.add_argument("--preview", default="tmp/ui/conf_lang_sc_preview.png",
@@ -133,13 +133,17 @@ def main(argv=None) -> int:
         sys.stdout.reconfigure(encoding="utf-8")
 
     spec = json.load(open(args.spec, encoding="utf-8"))
-    # 字体优先取 --font，其次 JSON 里的 font；缺省回落到随包思源黑体（字形和民汉贴图不完全一致，
-    # 但保证可构建）。字体文件不入库，见 doc/engine-mechanics.md §5.7。
-    font = args.font or spec.get("font") or "resource/fonts_sc/SourceHanSansCN-Bold.otf"
+    # 字体优先取 --font，其次 JSON 里的 font（正常留空），再缺省回落到随包思源黑体
+    # （字形和民汉贴图不完全一致，只保证可构建）。字体文件与字体路径都不入库，
+    # 见 doc/ui-textures.md §6。
+    json_font = spec.get("font") or ""
+    font = args.font or json_font or "resource/fonts_sc/SourceHanSansCN-Bold.otf"
     spec["font"] = os.path.abspath(font)
     if not os.path.exists(spec["font"]):
         raise SystemExit(f"缺少字体：{spec['font']}"
-                         f"（用 --font 指定，或改 resource/ui_sc/conf_lang_labels.json 的 font）")
+                         f"（用 --font 指定；字体路径不入库，不要写进 JSON）")
+    if not (args.font or json_font):
+        print("警告：未指定 --font，回退随包思源黑体（字形与民汉字形不一致，仅用于保证可构建）")
 
     tmpdir = tempfile.mkdtemp(prefix="ui_labels_")
     spec_path = os.path.join(tmpdir, "spec.json")

@@ -82,9 +82,11 @@ Storages.addAutoPath(System.exePath + "scn/");   // 松散目录，热更新
 
 运行期判据默认用 `System.inform` 弹窗，弹出后**由人工截图/读文字**再手动关掉（不再有自动点击脚本：模拟鼠标/按键驱动游戏不可靠，实测出现过把 Config 点成 End Game 的情况，见 `lessons-learned.md` §16）。**测试构建允许任意探针**（`System.inform` / `Debug.notice` / `Storages.getPlacedPath` 输出），做法是临时改 `script/build_patch.py::HOOK_LINES` 后构建到临时目录，例如：
 
+`<游戏目录>` = Steam 库下的 `steamapps/common/nine_kokoiro`（本机具体路径见 `AGENTS.md`「环境」）。
+
 ```powershell
 mamba run -n GalRev python script/build_patch.py --scn-dir tmp/build/lang4/scn `
-    --official-steam "E:/SteamLibrary/steamapps/common/nine_kokoiro/steam.xp3.orig" --out tmp/build/probe_test --allow-probe
+    --official-steam "<游戏目录>/steam.xp3.orig" --out tmp/build/probe_test --allow-probe
 ```
 
 发布闸：`build_patch.py` 的 `verify()` 会检查产物钩子里是否含 `System.inform` / `Debug.notice` / `getPlacedPath`，命中即判失败；只有显式 `--allow-probe` 才豁免（同时打印「不得作为发布物」）。所以正常 `--out releases` 的构建不可能夹带探针。
@@ -388,16 +390,10 @@ UI 文案与剧情脚本走**两套完全不同**的通路，别混着排查。
 
 **② 界面贴图（`uipsd/*.pimg` + `uipsd/*.func`）**
 
-- `.pimg` = PSB v3：`layers` 里每个图层的位图是一份 chunk 资源，键名 = `<layer_id>.tlg`（结构见 `file-formats.md` §5）。**但樱空素材的 `uipsd/sc/*_sc.pimg` 是 v2 + TLG6**（容器布局见 `file-formats.md` §5.2）。
-- 设置页/确认对话框里的**标签文字是烘死在位图上的**，`syslangtext` / `help` 里搜不到。判断方法：先在 `main/*.ini|txt` 里搜不到关键词，就用 OCR（Windows `Windows.Media.Ocr`，先用 System.Drawing 把透明图分别叠白/黑底再识别）扫一遍 `uipsd/sc/*_sc.pimg` 解出来的 PNG。
-- 改字流程：TLG6 解 PNG（GARbro `TlgFormat`）→ 按原字体/字号重排 → TLG5 编码写回对应 chunk（v2 容器重排见 `file-formats.md` §5.2）。这一步是**一次性脚本**（`tmp/`，不入库）；写回后必须自带两道校验：只动目标 chunk（其它 chunk 逐字节不变）、回读解码与源 PNG 逐像素一致（含 alpha）。
-- 改字的源 PNG（整幅贴图）也留在 `tmp/`，**不要放 `resource/ui_sc/` 里**——那个目录会被整目录装进 `patch3.xp3`。
-- **对齐规则（实机反馈过的坑，两条别混）**：
-  * 确认框（`dialog_sc` 的「确定…吗」这一系）：整句**居中**——按原文字中心摆，短句改短后若只保左边界，画面里会明显偏左。
-  * 游戏内菜单栏（`message_sc`）：**紧裁画布 + 文字起于 x=0**，照官方 `uipsd/cn/message_cn.pimg` 的形态。民汉那 20 张是「文字在画布内居中、左右留白 19–60 不等」，按固定位置贴图时同一列就会参差；官方繁中反而是每张紧贴文字（chunk 4–20 几乎都是 ink 起点 0）。改字后必须重裁，不能只改文字。
-  * 设置页列表（`conf_*_sc_3` 这类整页标签图）：原地改字、**保留项目符号与列位置**，按原文字左边界摆；只改 key（设置名），value（ON/OFF、数值按钮）在别的 chunk，不要动。
-- 字号建议**自动反解**：同一段文字的渲染墨迹宽度与原图墨迹宽度最接近的那个字号就是原字号（一次性脚本里就是这么做的），比逐一目测可靠。
-- 字体建议用**华康圆体 W9**，字号 16 px（设置页/确认页）、15 px（游戏内菜单栏与确认框）、17–18 px（快捷键页，逐行不同）。直接 16 px GDI+ 渲染会比原图粗约 20%，可行参数是**4 倍超采样 + 每像素 alpha 减 40 + 盒式降采样**（实测墨量 1.00×、二值 IoU 0.706）；`TextRenderingHint` 选 `AntiAlias` 或 `AntiAliasGridFit` 均可。
+引擎侧只有「变体名 + 加载」这两件事；**换字、字号/字重、对齐、擦除窗口等制作规格见 `doc/ui-textures.md`**。
+
+- `.pimg` = PSB：`layers` 里每个图层的位图是一份 chunk 资源，键名 = `<layer_id>.tlg`（结构见 `file-formats.md` §5）。官方变体是 v3 + TLG5；民汉素材的 `uipsd/sc/*_sc.pimg` 是 **v2 + TLG6**（容器布局见 `file-formats.md` §5.2）。
+- 设置页/确认对话框里的**标签文字是烘死在位图上的**，`syslangtext` / `help` 里搜不到——所以 UI 文案有「文本」与「位图」两条完全不同的通路，排查时先分清（定位方法与改图规格见 `ui-textures.md`）。
 - `.func` 是 KAG 的 UI 布局脚本，**同样是 TVP 加扰文本（mode 1）**，首行 `psd,<名字>` 决定用哪张图；写成 `psd,&GetUIFile("名字")` 才按当前 UI 语言找变体。
 - 变体规则即 `custom.tjs` 的 `GetUIFile`：`<chop>_<CurrentLanguageUITag><ext>` 存在则用，否则回落原名。目录子域由 `system/initialize.tjs` 的 `setupSubFolders(["uipsd/en", "uipsd/cn", ...])` 注册（只注册**目录**，不注册同名 xp3）。
 - 因此第 4 轨要新增 `uipsd/sc/<名>_sc.pimg`，并在钩子里 `addAutoPath("patch3.xp3>uipsd/sc/")`；`main/`（syslangtext、help）与 `image/`（`attention_sc.png`）同理。运行时逻辑（含 `LoadSysLangText` 补载、字体）在 `patch3.xp3` 的 `sc_hook.tjs`（归档根），见 §4.1。
@@ -406,11 +402,9 @@ UI 文案与剧情脚本走**两套完全不同**的通路，别混着排查。
 
 - 官方 `uipsd/conf_lang.pimg` 的 `@caps_lang/layer`（221×199，资源 `14.tlg`）把 `System Language / Main Text Language / Sub Text Language` 直接烘在图上；`data.xp3` 全文与所有脚本字符串池搜 `System Language` 命中 **0**，改 `syslangtext` 无效。验证：把 `14.tlg` 换成别的图，标题随之变化。
 - `conf_lang.func` 首行是 `psd,conf_lang`（不经过 `&GetUIFile`），且官方没有 `conf_lang_{jp,en,cn}.pimg` —— **官方三条语言轨看到的本来就是同一张英文图**，不是补丁「强制成英文」。
-- sc 轨要中文只能自造图：`script/make_ui_lang_caption.py`（取官方 `14.tlg` → 保留左侧圆点、清掉英文 → GDI+ 渲染简中标题 → 重编码 TLG → 替换进 pimg）+ `script/gen_ui_func.py`（`psd,conf_lang` → `psd,&GetUIFile("conf_lang")`）。后者对 jp/en/cn 语义中性：找不到 `conf_lang_<tag>.pimg` 就回落官方原图。
-- 字形按**民汉贴图**的实测量选定：同一句「简易保存、读取功能」16 px 下量「每像素墨覆盖率」（把不同背景归一化后可比），民汉 art = 0.400、华康圆体 W9(P) = 0.437、W7/W5 ≈ 0.30、思源圆黑体（Gen Jyuu Gothic）≈ 0.20、思源黑体 ≈ 0.22。所以用**华康圆体 W9**（真实字重，非合成），并以 2 倍超采样渲染后盒式降采样，让边缘与 art 一样柔。对照图与实机截图属一次性产物，不进 `resource/`；需要复核时按本节方法重跑 `script/make_ui_lang_caption.py` 并用 GDI+ 重渲染候选即可。
-- **字体文件不入库**（第三方商业字体）：`resource/ui_sc/conf_lang_labels.json` 的 `font` 指到本机路径，缺失时脚本直接报错而不是悄悄换字体；`--font/--style/--scale` 可覆盖。仓库默认回退是随包思源黑体（字形不完美但可构建）。
-- **禁止用 GDI+ 合成粗体凑字重**：`FontStyle::Bold` 在字体没有粗体面时会被 GDI+ 硬加粗（笔画变钝、字宽变化），和真实粗体不是一回事。`script/render_ui_labels.ps1` 现在对「非该字体真实字重」的请求直接 `exit 2`。
-- 标题摆放与页面其它标签对齐：文字左边缘 x=25、三行行带顶端 y=1/90/179（脚本会打印实测行带），字号 16 px、颜色 `(19,86,130)`（从民汉简中标签实色量出来）。官方英文原图行带是 1/90/179、文字左边缘 25，两者一致。
+- sc 轨要中文只能自造图：`script/make_ui_lang_caption.py`（取官方 `14.tlg` → 保留左侧圆点、清掉英文 → GDI+ 渲染简中标题 → 重编码 TLG → 替换进 pimg）+ `script/gen_ui_func.py`（`psd,conf_lang` → `psd,&GetUIFile("conf_lang")`）。后者对 jp/en/cn 语义中性：找不到 `conf_lang_<tag>.pimg` 就回落官方原图。字体/字号/摆放参数见 `ui-textures.md` §2。
+- **字体文件与字体路径都不入跟踪文件**（第三方商业字体）：`resource/ui_labels/conf_lang_labels.json` 的 `font` 留空，需要民汉字形时用 `--font <本机路径>` 传入；不传则回退随包思源黑体并打印警告（字形不完全一致，切莫当成成品）。
+- **禁止用 GDI+ 合成粗体凑字重**：`FontStyle::Bold` 在字体没有粗体面时会被 GDI+ 硬加粗（笔画变钝、字宽变化），和真实粗体不是一回事。`script/render_ui_labels.ps1` 对「非该字体真实字重」的请求直接 `exit 2`（确实需要加粗时用 `GraphicsPath` + 描边，见 `ui-textures.md` §3）。
 
 **④ UI 里硬编码的日文字体别名**
 

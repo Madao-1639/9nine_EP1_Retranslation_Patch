@@ -1,11 +1,11 @@
 # 验收标准与复跑方式
 
-所有命令都从项目根执行，环境 `GalRev`（`mamba run -n GalRev python …`）。
+所有命令都从项目根执行，环境 `GalRev`（`mamba run -n GalRev python …`）。`<游戏目录>` = Steam 库下的 `steamapps/common/nine_kokoiro`（本机具体路径见 `AGENTS.md`「环境」；文档只写占位符）。
 
 ## 0. 前置：官方文件在本地解包
 
 ```powershell
-mamba run -n GalRev python script/unpack_xp3.py "E:/SteamLibrary/steamapps/common/nine_kokoiro/data.xp3" `
+mamba run -n GalRev python script/unpack_xp3.py "<游戏目录>/data.xp3" `
     --cx-profile resource/cx/profile_9nine.json --only scn/ --out resource/official_scn
 ```
 （产物 `resource/official_scn/` 是游戏本体内容，已 gitignore，可随时重建。）
@@ -54,19 +54,19 @@ mamba run -n GalRev python script/verify_lang4.py --official resource/official_s
 
 ## 5.5 界面贴图改字
 
-界面贴图里的文字是烘死位图的，改它等于改图。流程与判据：
+界面贴图里的文字是烘死位图的，改它等于改图。**制作规格（每页字体/字号/光栅化参数/对齐/擦除窗口）在 `doc/ui-textures.md`**，本节只留流程与验收：
 
-1. TLG6 解 PNG（GARbro `TlgFormat.Read`；`tool/tlg.py` 只有 TLG5）；
-2. 按原字体（华康圆体 W9）/字号/颜色重排，画布与对齐按 `engine-mechanics.md` §5.7 的规则；
-3. TLG5 编码写回 v2 容器的目标 chunk（布局见 `file-formats.md` §5.2）。
+1. 解出目标标签层：只有还是原样 TLG6 的 chunk 才需 GARbro `TlgFormat.Read`；v1.3.2 之后改过的标签层已是 TLG5（`tool/tlg.py` 直接读），同页背景仍是 TLG6，不动它（哪张图的标签层在哪个 chunk 见 `ui-textures.md` §1）；
+2. 按 `ui-textures.md` §2 的参数重排（字号/字重/超采样/alpha 都是按本页原图标签反解出来的，反解方法见 §3），画布与对齐按 §4；
+3. TLG5 编码写回 v2 容器的目标 chunk（布局见 `file-formats.md` §5.2；阵列字段宽度可随产物加宽，头部 `0x1c`/`0x20` 字段跟着改）。
 
-**判据**：容器零改动往返逐字节一致；只有目标 chunk 变化（其它 chunk 逐字节相同）；回读解码与源 PNG 逐像素一致（含 alpha）；同一文件重跑一遍得到相同字节（幂等）。依据：`file-formats.md` §5.2 的容器布局 + 上述四条断言。
+**判据**：同 `ui-textures.md` §7 的五条（只动目标 chunk / 回读逐像素一致 / 幂等 / 窗口外零改动 / 设置名与 `help_conf_sc.txt` 顺序对得上）；另，容器零改动往返逐字节一致（布局依据 `file-formats.md` §5.2）。
 
 ## 6. 打包（`script/build_patch.py`）
 
 ```powershell
 mamba run -n GalRev python script/build_patch.py --scn-dir tmp/build/lang4/scn `
-    --official-steam（默认 resource/official_steam/steam.xp3） "E:/SteamLibrary/steamapps/common/nine_kokoiro/steam.xp3.orig" --out releases
+    --official-steam（默认 resource/official_steam/steam.xp3） "<游戏目录>/steam.xp3.orig" --out releases
 ```
 **判据**：产出 `releases/patch3.xp3`（17 个四块 scn）与 `releases/steam.xp3`（官方 4 条保留 + 源码钩子 + 官方原字节码 13,976 B）；钩子里不得含 `System.inform` / `Debug.notice` / `getPlacedPath` 探针（测试构建用 `--allow-probe` 豁免）；脚本自带闸：官方条目字节不变、钩子内容正确、原字节码副本一致、patch3 回读逐条与源 scn 一致（任一不过就不写出）。索引必须每文件一条 `hnfn`（`doc/engine-mechanics.md` §3.1）。依据：`script/build_patch.py`。
 
@@ -140,13 +140,13 @@ mamba run -n GalRev python script/gen_ui_func.py            # conf_lang.func 覆
 mamba run -n GalRev python script/make_ui_lang_caption.py   # 语言页三行标题贴图 conf_lang_sc.pimg
 ```
 
-不入库的material：`resource/ui_sc/{uipsd,image}/`（民汉贴图，`extract_ui_sc.py` 重建）、`resource/official_*/`（官方解包，`unpack_xp3.py` 重建）、`resource/fonts_sc/`（字体）；入库的只有 `resource/ui_sc/{main,sc}/`、`conf_lang_labels.json` 与 `resource/verify/` 下的证据。
+入库/不入库：入库的是**交付语料**（`resource/ui_sc/main/*.{ini,txt}`、`resource/ui_sc/uipsd/sc/*_sc.pimg`、`resource/ui_sc/image/*_sc.png`、`resource/ui_sc/*.tjs`）、渲染规格（`resource/ui_labels/`）与 `resource/verify/` 下的证据；不入库的是游戏本体内容（`resource/official_*/`、`resource/archive/`、`resource/fonts_sc/`，可由 `unpack_xp3.py` / `extract_ui_sc.py` 重建）与字体。
 ```
 
 
 ```
 
-字体前置：`script/make_ui_lang_caption.py` 读 `resource/ui_sc/conf_lang_labels.json` 的 `font`（华康圆体 W9，第三方字体不入库）；缺字体时脚本报错退出，不会悄悄换字体。只想验证管线可用 `--font resource/fonts_sc/SourceHanSansCN-Bold.otf`（字形不是民汉那套）。渲染器会拒绝非真实字重（`FontStyle` 未被字体支持时 `exit 2`）。
+字体前置：`script/make_ui_lang_caption.py` 读 `resource/ui_labels/conf_lang_labels.json` 的 `font`（默认留空）；不传 `--font` 时回退随包思源黑体并打印警告（字形不是民汉那套，只用于验证管线）。只想验证管线可用 `--font resource/fonts_sc/SourceHanSansCN-Bold.otf`。渲染器会拒绝非真实字重（`FontStyle` 未被字体支持时 `exit 2`）。
 
 语言页标题的位置/样式校验：脚本会打印实测行带，期望标题行带顶端 `1/90/179`、文字左边缘 `x=25`（与官方英文原图行带一致）；预览 PNG 写在 `tmp/ui/conf_lang_sc_preview.png`。
 - 钩子/脚本解耦闸（`script/build_patch.py` + `verify_ui_sc.py` 内置）：钩子只允许「转发官方 + 注册子域 + `KAGLoadScript("sc_hook.tjs")`」；

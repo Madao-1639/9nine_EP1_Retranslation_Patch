@@ -156,7 +156,7 @@
     }
   },
   "set": "chs_text",
-  "source": "D:\\My_Code\\tmp\\GamePatch\\9nine\\ep1\\nine_kokoiro_Retranslation_Patch\\archive\\releases\\unencrypted.xp3",
+  "source": "unencrypted.xp3",
   "source_kind": "xp3",
   "totals": {
     "chars": 168839,

@@ -132,6 +132,16 @@ def select_records(script: mdf.MdfScript, lang: str):
     return rows
 
 
+def portable_source(path: str) -> str:
+    """清单里记来源时做去隐私化：跟踪文件不能带本机路径（换主机就失效）。
+
+    `resource/` 下（项目自己的解包/备份产物）记相对路径，其余（如游戏目录里的
+    官方归档）只记文件名。
+    """
+    rel = os.path.relpath(os.path.abspath(path), os.getcwd()).replace(os.sep, "/")
+    return rel if rel.startswith("resource/") else os.path.basename(path)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     src = ap.add_mutually_exclusive_group(required=True)
@@ -178,7 +188,7 @@ def main(argv=None) -> int:
     index = {
         "set": os.path.basename(os.path.normpath(args.out)),
         "lang": args.lang,
-        "source": os.path.abspath(source),
+        "source": portable_source(source),
         "source_kind": "xp3" if args.from_xp3 else "dir",
         "scripts": scripts,
         "totals": {

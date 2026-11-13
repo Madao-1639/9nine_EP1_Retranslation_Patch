@@ -16,7 +16,12 @@ resource/fonts_sc/
 resource/official_uipsd/
 resource/official_steam/
 
+# 从游戏目录备份/解出来的原始文件（游戏本体内容，不入库）
+resource/archive/
+
 .mcp.json
+
+# 本机路径/本机环境（去隐私化：不进跟踪文件），见 AGENTS.local.md
 *.local.*
 .pi
 .zcode*
