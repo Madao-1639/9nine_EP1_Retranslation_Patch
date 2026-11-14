@@ -2,7 +2,7 @@
 
 本项目的简中界面贴图都是**换字**产物：把民汉素材（或官方图）里**烘死**的标签文字，按**本页原字体**重排，只动文字像素。
 
-引擎侧为什么会走到这些图（`GetUIFile` 变体名、子域注册、钩子 `addAutoPath`）见 `engine-mechanics.md` §5.7；容器的 chunk 布局与写回见 `file-formats.md` §5.2。本文只写**制作规格与判据**。
+引擎侧为什么会走到这些图（`GetUIFile` 变体名、子域注册、钩子 `addAutoPath`）见 `engine-mechanics.md` §5.7；容器的 chunk 布局与写回见 `file-formats.md` §5.3。本文只写**制作规格与判据**。
 
 ## 1. 交付资产与标签层位置
 
@@ -16,8 +16,9 @@
 | `uipsd/sc/conf_lang_sc.pimg` | 语言选择页标题（自造，见 `engine-mechanics.md` §5.7 ③） | chunk 6 = `14.tlg`（221×199） |
 | `image/attention_sc.png` | 注意图 | 整图 |
 
-- 民汉素材的 `_sc.pimg` 是 PSB **v2**（chunk 数据在文件尾部）；官方变体与 `conf_lang_sc` 是 v3。写回与阵列宽度见 `file-formats.md` §5.2。
-- 被改过的标签层现在都是 **TLG5**（v1.3.2 起），同页**背景 chunk 仍是 TLG6**：背景不动，也就不需要 TLG6 解码器（`tool/tlg.py` 直接读标签层）。
+- 民汉素材的 `_sc.pimg` 是 PSB **v2**（chunk 数据在文件尾部）；官方变体与 `conf_lang_sc` 是 v3。写回与阵列宽度见 `file-formats.md` §5.3。
+- 被改过的标签层现在都是 **TLG5**（v1.3.2 起），同页**背景 chunk 仍是 TLG6**。背景不动，但**要看它时能看**：`tool/tlg.py` 的 `decode()` 自动判型（TLG5/TLG6/`TLG0.0\0sds` 外壳），不需要 GARbro 转码。
+- 容器版本不用调用方关心：`tool/pimg.py` 的 `open_pimg()` 按 PSB v2/v3 自动分派，返回同一套接口（民汉 20 张是 v2，官方与 `conf_lang_sc.pimg` 是 v3）。
 
 ### 1.1 先定位：这句话到底在哪张图上
 

@@ -489,6 +489,15 @@ class PsbFile:
             body[pos + 1:pos + 1 + width] = value.to_bytes(width, "little")
         return bytes(body)
 
+    def __len__(self) -> int:
+        """chunk 资源个数（与 `tool/pimg.PimgV2` 保持同一套接口）。"""
+        return len(self.chunk_offsets)
+
+    @property
+    def original_bytes(self) -> bytes:
+        """`replace_resources({})` 会返回的那个字节串（带 `mdf` 外壳时是解壳后的）。"""
+        return self.body
+
     def resource_bytes(self, index: int) -> bytes:
         """取出 chunk 资源（`*.pimg` 里的 TLG 等）的原始字节。"""
         start = self.offset_chunk_data + self.chunk_offsets[index]

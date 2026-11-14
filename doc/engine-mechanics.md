@@ -392,7 +392,7 @@ UI 文案与剧情脚本走**两套完全不同**的通路，别混着排查。
 
 引擎侧只有「变体名 + 加载」这两件事；**换字、字号/字重、对齐、擦除窗口等制作规格见 `doc/ui-textures.md`**。
 
-- `.pimg` = PSB：`layers` 里每个图层的位图是一份 chunk 资源，键名 = `<layer_id>.tlg`（结构见 `file-formats.md` §5）。官方变体是 v3 + TLG5；民汉素材的 `uipsd/sc/*_sc.pimg` 是 **v2 + TLG6**（容器布局见 `file-formats.md` §5.2）。
+- `.pimg` = PSB：`layers` 里每个图层的位图是一份 chunk 资源，键名 = `<layer_id>.tlg`（结构见 `file-formats.md` §5）。官方变体是 v3 + TLG5；民汉素材的 `uipsd/sc/*_sc.pimg` 是 **v2 + TLG6**（容器布局见 `file-formats.md` §5.3）。
 - 设置页/确认对话框里的**标签文字是烘死在位图上的**，`syslangtext` / `help` 里搜不到——所以 UI 文案有「文本」与「位图」两条完全不同的通路，排查时先分清（定位方法与改图规格见 `ui-textures.md`）。
 - `.func` 是 KAG 的 UI 布局脚本，**同样是 TVP 加扰文本（mode 1）**，首行 `psd,<名字>` 决定用哪张图；写成 `psd,&GetUIFile("名字")` 才按当前 UI 语言找变体。
 - 变体规则即 `custom.tjs` 的 `GetUIFile`：`<chop>_<CurrentLanguageUITag><ext>` 存在则用，否则回落原名。目录子域由 `system/initialize.tjs` 的 `setupSubFolders(["uipsd/en", "uipsd/cn", ...])` 注册（只注册**目录**，不注册同名 xp3）。

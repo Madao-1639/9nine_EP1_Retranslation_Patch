@@ -33,6 +33,7 @@ UI 文案（`syslangtext`、`help_*`、界面贴图）**不在补丁范围**，�
 | 民汉文本 | 樱空汉化组 Ver1.0 简中文本，已入库 `resource/chs_text`（一脚本一文件）；官方三轨语料在 `resource/official_{jp,en,cn}`。另有 `adlr=0` 的**明文 xp3 变体**（三别名、索引不压缩，需 `version.dll` 才能读），本项目只把它当格式对照，交付物一律 Cx 加密包 |
 | 回写方式 | 一步：`script/extend_lang.py` 用 `tool/psb.PsbGraph` 整图重排（`parse_graph()` → `build()`）追加第 4 块，官方三块一个字节不动，零改动重建逐字节一致（早期「覆盖 cn 轨」的 `writeback.py` 路径已废弃删除，仅存 git 历史） |
 | 其它作 | 第 2–4 作与第 1 作同参数（`resource/cx/profile_9nine.json` 直接可用）。第 5 作（9-nine-NewEpisode）换了插件：两作 exe 的 `.text` 逐字节相同，差异只在 `.rdata` 内嵌的 `cxdec.tpm.dll`（`TVPSetXP3ArchiveExtractionFilter` + `DynamicCodeGen`，128 lane 运行时生成）；参数 `resource/cx/profile_9nine_ep5.json`、条目密钥缓存 `resource/cx/keys_9nine_ep5.json`、库 `tool/cxdec_v2.py`、解包 `script/unpack_ep5.py`，见 `doc/file-formats.md` §1.3 |
+| 民汉补丁容器 | 第 4/5 作的樱空补丁**不是 XP3**，是 **Enigma Virtual Box**（`EVB\0` 文件系统：exe 内嵌于 `.enigma1` 段，或外部 `*.pck`）。库 `tool/evb.py`（纯标准库，不依赖 `evbunpack`/`aplib`）、脚本 `script/unpack_evb.py`；两个作的包里 `.tlg` 是 **TLG6**（含 `TLG0.0\0sds` 外壳），解包时直接转 PNG。压缩条目（aPLib）**故意不实现、遇到就报错**（真实包压缩数全为 0，无样本可验），见 `doc/file-formats.md` §6 |
 
 细节见 `doc/`：`file-formats.md`（容器/PSB）、`text-model.md`（本文模型）、`engine-mechanics.md`（启动链/优先级/语言轨/字体）、`ui-textures.md`（界面贴图的换字规格）、`lessons-learned.md`、`acceptance-criteria.md`。
 
@@ -60,7 +61,7 @@ UI 文案（`syslangtext`、`help_*`、界面贴图）**不在补丁范围**，�
 ### 2. 目录与脚本组织
 
 ```
-tool/        长期复用的库（xp3 / cx / psb / scn / mdf / textset / krkr_text）
+tool/        长期复用的库（xp3 / cx / psb / scn / mdf / textset / krkr_text / tlg / pngio / pimg / evb）
 script/      项目流程脚本（提取、校验、回写、打包），从项目根执行
 resource/    可复用的数据产物（文本集、清单、渲染规格 ui_labels/、Cx 参数 profile；游戏本体解包/备份放 official_*、archive/，均不入库）
 doc/         知识文档
@@ -89,7 +90,23 @@ releases/    交付物
 - 行内标记必须原样保留：`%NNN;`（语音/角色标记）、`#RRGGBBAA;` / `#;`（颜色）、`[よみ,3]`（ruby）、`\\n`（换行）。
 - 控制台输出：`sys.stdout.reconfigure(encoding="utf-8")` 或保持 ASCII。
 
-### 5. 安全与备份
+### 5. Commit message
+
+用 **Conventional Commits**，中文书写。scope 尽量具体到模块名；一处改动跨多个模块时用逗号分隔。
+
+```
+<type>(<scope>): <简述>
+
+- <高层结论或取舍，一行一条>
+```
+
+- `type` 取 `feat` / `fix` / `refactor` / `docs` / `chore` / `test`；不确定时看 `git log` 里同类改动怎么标的。
+- `scope` 用**小写模块名**（`tlg` / `evb` / `pimg` / `psb` / `doc` …），多个用逗号分隔（`feat(tlg,evb):`）。不写文件名或路径。
+- **代码标识符、路径、命令、常量一律用反引号包裹**：`tool/tlg.py`、`decode()`、`TLG0.0\0sds`、`mamba run -n GalRev`。行内标记（`%NNN;`）同样处理。
+- `subject` 一句话说**做了什么**；并列主题用分号分隔（例：`feat: 新增第 4 语言轨 sc；修复自建 xp3 索引`）。
+- `body` 只写**结论与取舍**（为什么这样做、放弃了什么），不复述 diff、不抄函数名列表。文档改动、判据与复验步骤**不逐条罗列**——它们由 `doc/` 与 `acceptance-criteria.md` 承载，需要时在 body 里给指针。
+
+### 6. 安全与备份
 
 - **原生归档只读，唯一例外是 `steam.xp3`**。
 - 只读、绝不修改：`data.xp3` / `evimage.xp3` / `fgimage.xp3` / `voice.xp3` / `video.xp3` / `adult.xp3` 及所有 `*.sig`（也不做「只改索引 + 尾部追加」式重写）。
@@ -100,7 +117,7 @@ releases/    交付物
 - 覆盖任何已产出补丁前先备份（`*.bak`）并在 `doc/` 记录原因。
 - 不把游戏素材提交进仓库：从游戏目录提取/备份的东西（官方归档副本、解出来的 `scn`/`tjs`/字体/贴图）一律放 `resource/` 下（`resource/official_*`、`resource/archive/`），并在 `.gitignore` 里忽略。
 
-### 6. 测试与验收
+### 7. 测试与验收
 
 每个阶段结束前：跑该阶段校验脚本 → 抽样人工比对 → 更新文档 → 清理 `tmp/`。
 验收标准见 `doc/acceptance-criteria.md`；判定 = 离线闸（行数 / 槽位 / 往返 / 回读）+ 游戏内确认。

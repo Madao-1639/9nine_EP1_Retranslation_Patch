@@ -104,31 +104,28 @@ PSB 头 `0x28` 处 4 字节是 checksum。**注意**：现存的 scn checksum �
 
 官方索引名是哈希，要按路径取文件就必须先算出 md5。可用的候选名登记在 `resource/name_candidates.txt`；`script/unpack_xp3.py --only scn/` 会连同内置候选一起尝试。
 
-## 5. `.pimg`：PSB v3 + TLG5 位图 chunk
+## 5. `.pimg`：PSB + TLG 位图 chunk
 
-界面贴图（`uipsd/*.pimg`）是 PSB v3，对象图里 `layers[]` 描述图层，位图本身放在**chunk 资源区**：每个图层一份，键名 `<layer_id>.tlg`，内容是该层位图的 TLG5。
+界面贴图（`uipsd/*.pimg`）对象图里 `layers[]` 描述图层，位图本身放在**chunk 资源区**：每个图层一份，键名 `<layer_id>.tlg`，内容是 TLG 位图。**两个 PSB 版本同时在用**，改图前先判版本：
 
-**但民汉素材里的 20 张 `uipsd/sc/*_sc.pimg` 是 PSB v2**（头部没有 `header_length`，`tool/psb.py` 会报 `unsupported PSB version 2`），见 §5.2。
+| 来源 | PSB 版本 | chunk 里的 TLG |
+|---|---|---|
+| 官方 `uipsd/*.pimg`（含繁中变体 `uipsd/cn/*_cn.pimg`） | v3 | TLG5 |
+| 民汉素材 `uipsd/sc/*_sc.pimg`（20 张） | **v2** | **TLG6**（个别已被我们改成 TLG5） |
+| 本项目自造 `uipsd/sc/conf_lang_sc.pimg` | v3 | TLG5 |
+
+**改 chunk 不需要关心版本**：用 `tool/pimg.py` 的统一入口，两个版本返回同一套接口（`version` / `len()` / `original_bytes` / `resource_bytes(i)` / `replace_resources(mapping)`）：
+
+```python
+from tool import pimg, tlg
+f = pimg.open_pimg(data)                     # v2 / v3 自动分派
+img = tlg.decode(f.resource_bytes(3))        # 拿到 Image（带 .kind）
+out = f.replace_resources({3: tlg.encode(img.width, img.height, img.rgba)})
+```
+
+要按**图层名**找 chunk（只有 v3 有名字池）才直接用 `tool/psb.py` 的 `PsbFile`。
 
 PSB 的 chunk 表在对象图之后：`chunk_offsets`（相对 chunk 数据区起点）、`chunk_lengths`、然后 chunk 数据区。**官方打包器把每个 chunk 起点按 4 字节对齐**，两张表后面还有一段对齐填充（例：`uipsd/conf_lang.pimg` 表区 35 字节 = 17 + 18，chunk 起点 0/704/1412/…，全部 4 的倍数）。改资源时对齐和填充都要照抄，否则「原样替换」都不能逐字节往返。`tool/psb.PsbFile.replace_resources()`实现这套重排（零改动往返、同内容替换都逐字节一致）。
-
-### 5.2 v2 容器（民汉素材）
-
-v2 只有 7 个 u32，第 5/6/7 个才是三个 chunk 偏移：
-
-```
-0x00 "PSB\0" | 0x04 u16 version(=2) | 0x06 u16 encrypt
-0x08 u32 ×7：前四个与 names / strings 有关（改贴图用不到），
-              [4] chunk_offsets  [5] chunk_lengths  [6] chunk_data
-```
-
-与 v3 的差别：**chunk 数据在文件尾部**（其后只剩 16 B 尾巴），对象图在数据区之前。所以替换某个 chunk 只改两个整数阵列 + 尾部数据，其余字节一个不动（**零改动重建**时两个阵列的字段宽度当然也不变）。实测 20 张 `_sc.pimg` 按此法零改动往返 **20/20 逐字节一致**。
-
-> 字段宽度**不是固定的**：两个阵列各自是 PSB 自描述数组（type byte 0x0d–0x14 给 count 宽度，紧跟的 entry type 给元素宽度），换进来的 chunk 变大后可以把元素宽度加宽。实例：替换 `conf_dlg_sc` 的标签 chunk（50096 → 76781 B）后，chunk offsets 阵列从 2 字节（entry type `0x0e`）变 3 字节（`0x0f`），同时要把头部 `0x1c`（chunk_lengths 位置）与 `0x20`（chunk_data 位置）两个 u32 跟着变大（本例各 +4，因为阵列长了 4 B）。引擎按宽度读：`conf_mes_sc` / `conf_key_sc` 本来就是 3 字节 offsets、`conf_sys_sc` 的 chunk 起点并不 4 字节对齐（801/4803/8839），实机都正常 ⇒ 既不要求固定宽度，也不要求 chunk 起点对齐。
-
-> 容器读写与重编码是一次性脚本（`tmp/`，任务结束即清理，不随仓库分发）。要重做时照上面的布局自己写：解析两个阵列 → 算新 offsets/lengths → 拼 `head + off_arr + len_arr + 新 chunk 数据 + tail`。
-
-注意：chunk 数据的 TLG 是 **TLG6**（`TLG0.0` 魔数），而 `tool/tlg.py` 只实现 TLG5 编解码。官方繁中变体（`data.xp3` 里的 `uipsd/cn/*_cn.pimg`）是 PSB **v3 + TLG5**，可以直接用 `tool/psb.py` + `tool/tlg.py` 读出来当**对齐基准**（改 sc 版贴图时用它对齐左边界/画布裁切方式）。改图时先把 TLG6 解成 PNG（用 GARbro 的 `TlgFormat.Read`，本仓库不往里加 TLG6 解码器），改完再以 **TLG5** 写回 —— 引擎两种都读（官方 v3 pimg 本身就是 TLG5）。
 
 ### 5.1 TLG5（`TLG5.0\0raw\x1a`）
 
@@ -146,7 +143,86 @@ blocksize[nblocks] u32 × nblocks
 - LZSS 的 4096 字节滑窗在整张图的所有块、所有平面之间**连续**复用；匹配允许与当前位置重叠
   （逐字节复制的 run-length）。**不是 zlib**，第一次实现时踩过这个坑。
 - `colors` 是 3（BGR）或 4（BGRA）；TLG5 内部通道顺序是 **BGRA**。
-- 归档里也可能出现 **TLG6**（`TLG0.0\0sds\x1a` + `TLG6.0…`，Golomb 编码）：民汉素材的 20 张 `pimg` 就是 TLG6，本项目只实现 TLG5 的编解码（`tool/tlg.py`），写出去的 `_sc` 贴图一律 TLG5；引擎两种都读，实测 TLG5 产物能正常显示。依据：`resource/ui_sc/uipsd/sc/*.pimg` 里 `TLG6` 魔数计数 24 次（民汉）vs 我们产出的 `conf_lang_sc.pimg` 全是 TLG5。
 
+**外壳**：TLG5 与 TLG6 都可能被包在 `TLG0.0\0sds\x1a` 里（15 字节，其后从 +15 起才是裸 TLG）。第 4 作民汉素材的 1280×720 背景就是「外壳 + TLG5」；`tool/tlg.py` 的 `decode()` 自动跳过外壳。
 
-解码/编码实现：`tool/tlg.py`（GARbro `ArcFormats/KiriKiri/ImageTLG.cs` TLG5 分支的 Python 移植，编码侧是自写的 LZSS）；PNG 读写：`tool/pngio.py`。
+### 5.2 TLG6（`TLG6.0\0raw\x1a`）
+
+```
+"TLG6.0\0raw" (10) | 0x1a | colors(1/3/4) | 0 | 0 | 0 | width u32 | height u32
+u32 max_bit_length
+u32 inbuf_size | LZSS(色度过滤类型表，每 8×8 块 1 字节)
+逐 8 行组、逐颜色平面：
+    u32 bit_length（高 2 位 = 熵编码方法，0 = Golomb；其余未实现）
+    payload
+```
+
+两个必须踩过才知道的点（`lessons-learned.md` §18 有留档）：
+
+1. **色度过滤表的 LZSS 初始字典**是 `for i in 32: for j in 16: [i,i,i,i,j,j,j,j]`，`i`/`j` 各占 4 个**相同**字节（不是 `[i,0,0,0]`）。填错时首块过滤类型全错，图像呈块状色斑。
+2. **过滤类型要「先把 v 按通道相关式展开，再喂 MED/AVG」**（偶数 = MED 中值边缘检测，奇数 = AVG 平均）。只照抄那 30 项表会漏掉「先展开」这一步。
+
+另外两条结构事实（不踩坑但实现时必须照做）：
+
+- **逐行蛇形扫描**：行方向按 `(y & 1) ^ 1` 交替，反向行要先把 inbuf 游标推到行尾再往回走，块间再按 `oddskip` 补偿。整张图当同一方向解会得到锯齿状错位。
+- **行尾有「零头块」**：宽高不一定是 8 的倍数（`main_count = width // 8`、`fraction = width - main_count * 8`），`main_count` 段与零头段**共用同一行的预测器状态**，但各自在 `pixelbuf` 里的起点不同（`8 × 组内行号` 与 `fraction × 组内行号`）。零头段漏解或起点算错，表现为每行右侧一条竖带乱码。
+
+**写入端只做 TLG5**：TLG6 要写 Golomb 编码器 + 30 种预测器的编码侧，成本远大于收益，而引擎两个变体都读。`tool/tlg.py encode()` 因此永远产出 TLG5 —— **这不是漏做**。
+
+解码/编码实现：`tool/tlg.py`（GARbro `ArcFormats/KiriKiri/ImageTLG.cs` 的 Python 移植；TLG5/6 解码与 GARbro **逐像素一致** —— 跨两作 16 张跨页样本 RGBA 全字节相等 16/16；编码侧是自写的 TLG5 LZSS）。PNG 读写：`tool/pngio.py`。
+
+### 5.3 v2 容器（民汉素材）
+
+v2 只有 7 个 u32，第 5/6/7 个才是三个 chunk 偏移：
+
+```
+0x00 "PSB\0" | 0x04 u16 version(=2) | 0x06 u16 encrypt
+0x08 u32 ×7：前四个与 names / strings 有关（改贴图用不到），
+              [4] chunk_offsets  [5] chunk_lengths  [6] chunk_data
+```
+
+与 v3 的差别：**chunk 数据在文件尾部**（其后只剩 16 B 尾巴），对象图在数据区之前。所以替换某个 chunk 只改两个整数阵列 + 尾部数据，其余字节一个不动（**零改动重建**时两个阵列的字段宽度当然也不变）。实测 20 张 `_sc.pimg` 按此法零改动往返 **20/20 逐字节一致**。
+
+> 字段宽度**不是固定的**：两个阵列各自是 PSB 自描述数组（type byte 0x0d–0x14 给 count 宽度，紧跟的 entry type 给元素宽度），换进来的 chunk 变大后可以把元素宽度加宽。实例：替换 `conf_dlg_sc` 的标签 chunk（50096 → 76781 B）后，chunk offsets 阵列从 2 字节（entry type `0x0e`）变 3 字节（`0x0f`），同时要把头部 `0x1c`（chunk_lengths 位置）与 `0x20`（chunk_data 位置）两个 u32 跟着变大（本例各 +4，因为阵列长了 4 B）。引擎按宽度读：`conf_mes_sc` / `conf_key_sc` 本来就是 3 字节 offsets、`conf_sys_sc` 的 chunk 起点并不 4 字节对齐（801/4803/8839），实机都正常 ⇒ 既不要求固定宽度，也不要求 chunk 起点对齐。
+
+读写与重编码：**`tool/pimg.py`** 的 `PimgV2`（经 `open_pimg()` 分派）。规则与判据：
+
+1. 表区先尽量保持原长（照抄原填充）⇒「同内容替换」能逐字节往返；本作 20 张 `_sc.pimg` 实测 **零改动 20/20 + 同内容替换 20/20 均逐字节一致**。
+2. 新表比原表长时**就让表变长**，头部 `[5]`/`[6]` 跟着推（实测 `conf_sys_sc` 把 chunk3 撑大后 offsets 阵列 2→3 字节，回读正确）。
+3. chunk 之间的对齐粒度按原文件推（本批 20 张全部**紧密排列、gap=0**，与 v3 官方包的 4 字节对齐不同）。
+4. 文件尾不属于任何 chunk 的字节原样带过。
+
+改图流程：`PimgV2.resource_bytes()` 取 chunk → `tool/tlg.py` 解码（v2 素材是 TLG6，本仓库已支持）→ 改字 → `tool/tlg.py encode()` 一律以 **TLG5** 写回（引擎两种都读）。官方繁中变体（`uipsd/cn/*_cn.pimg`）是 v3 + TLG5，用 `tool/psb.py` 读出来当**对齐基准**（左边界/画布裁切）。
+
+## 6. 民汉补丁的容器：Enigma Virtual Box
+
+樱空汉化组的第 4/5 作补丁**不是 XP3**，是 Enigma Virtual Box（EVB）：把文件塞进宿主 PE 的 `.enigma1` 段尾部，或单独存成外部 `.pck`。它与 krkr 引擎无关，是第三方打包器。
+
+| 载体 | 魔数位置 | 本作例 |
+|---|---|---|
+| exe 内嵌 | `.enigma1` 段内 | 第 5 作 `nine_new_chs.exe`（`EVB\0` @ `0x435cce`） |
+| 外部包 | 文件偏移 0 | 第 4 作 `chsdata.pck`（479 文件）、`update.pck`（54 个 scn） |
+
+节点表布局（PE-external 变体）：
+
+```
+EVB_PACK_HEADER  "EVB\0" + 60s
+EVB_NODE_MAIN    u32 size | 8s | u32 objects_count
+逐节点（顺序 = 文件系统树的前序遍历）：
+  EVB_HEADER_NODE   u32 size | 8s | u32 objects_count
+  EVB_NODE_NAMED    u16 名（UTF-16LE，双 0 结尾）| u8 type
+  type=2（文件）    + 2s | u32 original_size | 4s | 8s×3(FILETIME) | 15s | u32 stored_size
+  type=3（目录）    + 25 字节
+```
+
+要点（都是踩过的坑）：
+
+* 主节点之后要**回退 1 字节**才是第一个头节点起点（`evbunpack::pe_external_tree` 的行为）。不回退会把下一个 u32 读成 0，整棵树只解出主节点。
+* 节点 `offset` 是**相对文件开头的绝对偏移**（内容区起点已含魔数）。早期把魔数偏移又加了一次，外部包（魔数为 0）看不出差别、exe 内嵌时读到错位置。
+* 目录 `%DEFAULT FOLDER%` 是虚拟根，路径要折叠掉。
+* 包里的 `.tjs`/`.txt`/`.ks` 是 **UTF-16LE 明文**（不是 TVP 打散，与 XP3 里的不同）。
+
+**分块压缩：本库不解压，只报错。** `stored_size != original_size` 的条目是 EVB 的分块 aPLib 压缩（每块 aPLib，块长表 = 8 字节头 + 每 3 个 u32 取一个长度）。本项目接触的全部真实包（第 4/5 作 4 个包共 663 个条目）与 `evbunpack` 自带 11 个测试包，压缩条目数均为 **0**，没有真实样本可验证 aPLib 解码器，按「报错优先」不实现（`tool/evb.py` 文末有 TODO 标记）。宁可靠错，也不放一个跑不通的分块解压器——解错了会静默产出坏文件。
+
+工具：`tool/evb.py`（纯标准库重写，不依赖 `evbunpack`/`aplib`）+ `script/unpack_evb.py`（`list` / `extract --png`）。
+判据：3 个真实包共 650 个文件，与 `evbunpack` 的提取结果**逐个 sha256 一致**。

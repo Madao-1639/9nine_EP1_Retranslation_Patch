@@ -156,9 +156,13 @@ def main(argv=None) -> int:
     f = psb.PsbFile(official)
     res = f.root[CAPTION_KEY]
     cap = f.resource_bytes(res.index)
-    w, h, base_rgba = tlg.decode(cap)
+    src = tlg.decode(cap)
+    if src.kind != tlg.KIND_TLG5:
+        # 官方 v3 pimg 的 caption 一直是 TLG5；换成 TLG6 的源时不要静默改格式
+        raise SystemExit(f"官方 caption 期望 TLG5，实际 {src.kind}（{src}）")
+    w, h = src.width, src.height
 
-    base = bytearray(base_rgba)
+    base = bytearray(src.rgba)
     erase_text(base, w, h, TEXT_LEFT)
     lw, lh, over = pngio.read(open(png_path, "rb").read())
     scale = int(spec.get("scale", 1))
@@ -177,7 +181,7 @@ def main(argv=None) -> int:
     if len(texts) < EXPECTED_BANDS:
         raise SystemExit("合成后标题行没有文字像素")
 
-    new_tlg = tlg.encode(w, h, merged)
+    new_tlg = tlg.encode(w, h, merged, kind=src.kind)
     out = f.replace_resources({res.index: new_tlg})
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with open(args.out, "wb") as fp:
@@ -186,8 +190,8 @@ def main(argv=None) -> int:
     # 回读闸
     f2 = psb.PsbFile(open(args.out, "rb").read())
     got = f2.resource_bytes(f2.root[CAPTION_KEY].index)
-    w2, h2, back = tlg.decode(got)
-    if (w2, h2) != (w, h) or back != merged:
+    back = tlg.decode(got)
+    if (back.width, back.height) != (w, h) or back.rgba != merged:
         raise SystemExit("回读不一致：重编码后的标题位图与预期不符")
     changed = [i for i in range(len(f.chunk_offsets))
                if f2.resource_bytes(i) != f.resource_bytes(i)]

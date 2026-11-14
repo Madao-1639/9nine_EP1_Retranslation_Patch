@@ -56,11 +56,11 @@ mamba run -n GalRev python script/verify_lang4.py --official resource/official_s
 
 界面贴图里的文字是烘死位图的，改它等于改图。**制作规格（每页字体/字号/光栅化参数/对齐/擦除窗口）在 `doc/ui-textures.md`**，本节只留流程与验收：
 
-1. 解出目标标签层：只有还是原样 TLG6 的 chunk 才需 GARbro `TlgFormat.Read`；v1.3.2 之后改过的标签层已是 TLG5（`tool/tlg.py` 直接读），同页背景仍是 TLG6，不动它（哪张图的标签层在哪个 chunk 见 `ui-textures.md` §1）；
+1. 解出目标标签层：`tool/pimg.py` 取 chunk → `tool/tlg.py` 解码（自动判 TLG5/TLG6/`TLG0.0\0sds` 外壳，**不再需要 GARbro 转码**；v1.3.2 之后改过的标签层已是我们写的 TLG5，同页背景仍是 TLG6 但不动它）。哪张图的标签层在哪个 chunk 见 `ui-textures.md` §1；
 2. 按 `ui-textures.md` §2 的参数重排（字号/字重/超采样/alpha 都是按本页原图标签反解出来的，反解方法见 §3），画布与对齐按 §4；
-3. TLG5 编码写回 v2 容器的目标 chunk（布局见 `file-formats.md` §5.2；阵列字段宽度可随产物加宽，头部 `0x1c`/`0x20` 字段跟着改）。
+3. `tool/tlg.encode()` 出 TLG5（`kind` 只能是 TLG5），`tool/pimg.py` 的 `replace_resources()` 写回目标 chunk（布局见 `file-formats.md` §5.3；v2 的阵列字段宽度由工具按需自动加宽，头部两个偏移跟着推）。
 
-**判据**：同 `ui-textures.md` §7 的五条（只动目标 chunk / 回读逐像素一致 / 幂等 / 窗口外零改动 / 设置名与 `help_conf_sc.txt` 顺序对得上）；另，容器零改动往返逐字节一致（布局依据 `file-formats.md` §5.2）。
+**判据**：同 `ui-textures.md` §7 的五条（只动目标 chunk / 回读逐像素一致 / 幂等 / 窗口外零改动 / 设置名与 `help_conf_sc.txt` 顺序对得上）；另，容器零改动往返逐字节一致（v2 布局依据 `file-formats.md` §5.3）。
 
 ## 6. 打包（`script/build_patch.py`）
 
@@ -192,3 +192,28 @@ mamba run -n GalRev python script/pack_ep5.py <out.xp3> <srcdir> --exe <nine_new
 2. 索引里每条 `adlr` == `adler32(明文)`，且条目带加密标记（`info.flags & 0x80000000`）；
 3. 产物再过一遍 `verify`，判型全 ok、`* BAD` = 0（本机实测：5 条样例，含 `.png`/`.scn`/加扰文本）；
 4. 改过内容（新 `adlr` → 新密钥）的样例必须能在只给 `--exe` 的情况下自动补算并通过 1–3。
+
+## 13. 民汉补丁（EVB）解包闸 + TLG 解码闸
+
+民汉补丁不是 XP3，是 Enigma Virtual Box（`doc/file-formats.md` §6）。工具：`tool/evb.py`、`tool/tlg.py`、`tool/pimg.py`；脚本 `script/unpack_evb.py`。
+
+```powershell
+# 列目录（不落盘）
+mamba run -n GalRev python script/unpack_evb.py list <nine_new_chs.exe> <chsdata.pck> <update.pck>
+# 提取（*.tlg 解成 PNG，幂等：已存在且大小一致就跳过）
+mamba run -n GalRev python script/unpack_evb.py extract <pkg> <outdir> --png
+```
+
+判据（任一不过即失败）：
+
+1. **EVB 节点数**：第 5 作 `nine_new_chs.exe` = 130 文件 / 18 目录（魔数 `0x435cce`）；第 4 作
+   `chsdata.pck` = 479 文件 / 22 目录（魔数 0）、`update.pck` = 54 文件、两个 `*.exe` = 0 文件（空包）。
+2. **全量哈希对拍**：与 `<GalRev 知识库>/../evbunpack`（或任一份 `evbunpack` 检出）的提取结果**逐文件 sha256 一致**（3 包 650 文件）。
+   注意参考实现要求 fd 停在魔数处（偏移含魔数），传切过片的 BytesIO 会全错。
+3. **提取幂等**：`extract` 重跑一次必须「写出 0 个，跳过 N 个」。
+4. **TLG 解码**：`tool/tlg.py decode()` 与 GARbro `TlgFormat.Read` **逐像素一致** —— 跨两作 16 张跨页样本 RGBA 全字节相等 16/16，覆盖 TLG6 与「外壳 + TLG5」两种形态。重合判据是**全字节相等**，不是「看起来对」（块状色斑这类系统性错误肉眼容易放过）。
+5. **压缩条目必须报错**：`stored_size != original_size` 的条目要抛 `EvbError` 并说明"未实现 aPLib"，
+   不允许静默跳过（两个作的真实包压缩条目数都应为 0）。
+6. **pimg v2 往返**：`resource/ui_sc/uipsd/sc/*_sc.pimg` 20 张 v2 容器，
+   `replace_resources({})` 与「逐 chunk 原样替换」都必须与原文件**逐字节一致**（20/20）。
+
